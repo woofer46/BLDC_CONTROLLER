@@ -62,15 +62,15 @@ void disable_tim_chanels(void);
 #define Speed1000_2 TIM_SetCompare2(TIM4, 2000)
 #define Speed1000_3 TIM_SetCompare3(TIM4, 2000)
 
-//Двигатель 1
+//Р”РІРёРіР°С‚РµР»СЊ 1
 #define ReadPhase_U1 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_0)
 #define ReadPhase_V1 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_1)
 #define ReadPhase_W1 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_2)
-//Двигатель 2
+//Р”РІРёРіР°С‚РµР»СЊ 2
 #define ReadPhase_U2 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_3)
 #define ReadPhase_V2 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4)
 #define ReadPhase_W2 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_5)
-//Двигатель 1
+//Р”РІРёРіР°С‚РµР»СЊ 1
 #define Disable_Ho_U1 TIM_CCxCmd(TIM8, TIM_Channel_1, TIM_CCx_Disable);
 #define Disable_Ho_V1 TIM_CCxCmd(TIM8, TIM_Channel_2, TIM_CCx_Disable);
 #define Disable_Ho_W1 TIM_CCxCmd(TIM8, TIM_Channel_3, TIM_CCx_Disable);
@@ -79,7 +79,7 @@ void disable_tim_chanels(void);
 #define Enable_Ho_V1 TIM_CCxCmd(TIM8, TIM_Channel_2, TIM_CCx_Enable);
 #define Enable_Ho_W1 TIM_CCxCmd(TIM8, TIM_Channel_3, TIM_CCx_Enable);
 
-//Двигатель 2
+//Р”РІРёРіР°С‚РµР»СЊ 2
 #define Disable_Ho_U2 TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Disable);
 #define Disable_Ho_V2 TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Disable);
 #define Disable_Ho_W2 TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Disable);
@@ -88,7 +88,7 @@ void disable_tim_chanels(void);
 #define Enable_Ho_V2 TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Enable);
 #define Enable_Ho_W2 TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Enable);
 
-//Двигатель 1
+//Р”РІРёРіР°С‚РµР»СЊ 1
 #define Disable_Lo_U1 GPIO_ResetBits(GPIOA, GPIO_Pin_7);
 #define Disable_Lo_V1 GPIO_ResetBits(GPIOB, GPIO_Pin_0);
 #define Disable_Lo_W1 GPIO_ResetBits(GPIOB, GPIO_Pin_1);
@@ -97,7 +97,7 @@ void disable_tim_chanels(void);
 #define Enable_Lo_V1 GPIO_SetBits(GPIOB, GPIO_Pin_0);
 #define Enable_Lo_W1 GPIO_SetBits(GPIOB, GPIO_Pin_1);
 
-//Двигатель 2
+//Р”РІРёРіР°С‚РµР»СЊ 2
 #define Disable_Lo_U2 GPIO_ResetBits(GPIOB, GPIO_Pin_13);
 #define Disable_Lo_V2 GPIO_ResetBits(GPIOB, GPIO_Pin_14);
 #define Disable_Lo_W2 GPIO_ResetBits(GPIOB, GPIO_Pin_15);
@@ -113,20 +113,20 @@ int main(void)
 	SystemInit();
 	SysTick_Config(SystemCoreClock/1000);
 
-	GPIO_InitTypeDef GPIO_InitStructure; // Стукрутра инициализации GPIO
+	GPIO_InitTypeDef GPIO_InitStructure; // РЎС‚СѓРєСЂСѓС‚СЂР° РёРЅРёС†РёР°Р»РёР·Р°С†РёРё GPIO
 	//-----------------------------------------------------------------------
-	// Включение тактирования Таймеров
+	// Р’РєР»СЋС‡РµРЅРёРµ С‚Р°РєС‚РёСЂРѕРІР°РЅРёСЏ РўР°Р№РјРµСЂРѕРІ
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM8, ENABLE);
 	//-----------------------------------------------------------------------
-	// Включение тактирования GPIO
+	// Р’РєР»СЋС‡РµРЅРёРµ С‚Р°РєС‚РёСЂРѕРІР°РЅРёСЏ GPIO
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOE, ENABLE);
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
 	//-----------------------------------------------------------------------
-	// Двигатель 2, верхние ключи
+	// Р”РІРёРіР°С‚РµР»СЊ 2, РІРµСЂС…РЅРёРµ РєР»СЋС‡Рё
 	//-----------------------------------------------------------------------
-    // Конфигурация портов TIM1 CH1(PA8), CH2(PE11), CH3(PA10)
+    // РљРѕРЅС„РёРіСѓСЂР°С†РёСЏ РїРѕСЂС‚РѕРІ TIM1 CH1(PA8), CH2(PE11), CH3(PA10)
 	GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_8|GPIO_Pin_10;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
@@ -141,14 +141,14 @@ int main(void)
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
 	GPIO_Init(GPIOE, &GPIO_InitStructure);
 	//-----------------------------------------------------------------------
-	// Подключение портов к альтернативной функции TIM1
+	// РџРѕРґРєР»СЋС‡РµРЅРёРµ РїРѕСЂС‚РѕРІ Рє Р°Р»СЊС‚РµСЂРЅР°С‚РёРІРЅРѕР№ С„СѓРЅРєС†РёРё TIM1
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource8, GPIO_AF_TIM1);
 	GPIO_PinAFConfig(GPIOE, GPIO_PinSource11, GPIO_AF_TIM1);
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_TIM1);
 	//-----------------------------------------------------------------------
-	// Двигатель 1, верхние ключи
+	// Р”РІРёРіР°С‚РµР»СЊ 1, РІРµСЂС…РЅРёРµ РєР»СЋС‡Рё
 	//-----------------------------------------------------------------------
-	// Конфигурация портов TIM8 CH1(PC6), CH2(PC7), CH3(PC8)
+	// РљРѕРЅС„РёРіСѓСЂР°С†РёСЏ РїРѕСЂС‚РѕРІ TIM8 CH1(PC6), CH2(PC7), CH3(PC8)
 	GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_6|GPIO_Pin_7|GPIO_Pin_8;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
@@ -156,19 +156,19 @@ int main(void)
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 	//-----------------------------------------------------------------------
-	// Подключение портов к альтернативной функции TIM8
+	// РџРѕРґРєР»СЋС‡РµРЅРёРµ РїРѕСЂС‚РѕРІ Рє Р°Р»СЊС‚РµСЂРЅР°С‚РёРІРЅРѕР№ С„СѓРЅРєС†РёРё TIM8
     GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_TIM8);
     GPIO_PinAFConfig(GPIOC, GPIO_PinSource7, GPIO_AF_TIM8);
     GPIO_PinAFConfig(GPIOC, GPIO_PinSource8, GPIO_AF_TIM8);
 	//-----------------------------------------------------------------------
-    // Настройка таймеров
+    // РќР°СЃС‚СЂРѕР№РєР° С‚Р°Р№РјРµСЂРѕРІ
     // *To get TIM3 counter clock at 28 MHz, the prescaler is computed as follows:
     // *Prescaler = (TIM3CLK / TIM3 counter clock) - 1
     // *Prescaler = ((SystemCoreClock /2) /28 MHz) - 1
     //-----------------------------------------------------------------------
     PrescalerValue = (uint16_t) ((SystemCoreClock /2) / 28000000) - 1;
     //-----------------------------------------------------------------------
-    // Настройка TIM1 Двигатель 2
+    // РќР°СЃС‚СЂРѕР№РєР° TIM1 Р”РІРёРіР°С‚РµР»СЊ 2
     TIM_TimeBaseStructure.TIM_Period=2000;
     TIM_TimeBaseStructure.TIM_Prescaler = PrescalerValue;
     TIM_TimeBaseStructure.TIM_ClockDivision = 0;
@@ -193,10 +193,10 @@ int main(void)
     TIM_OCInitStructure.TIM_Pulse=380;//
     TIM_OC3Init(TIM1, &TIM_OCInitStructure);
     TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
-    // Предзагрузка
+    // РџСЂРµРґР·Р°РіСЂСѓР·РєР°
     TIM_ARRPreloadConfig(TIM1, ENABLE);
     //-----------------------------------------------------------------------
-    // Настройка TIM8 Двигатель 1
+    // РќР°СЃС‚СЂРѕР№РєР° TIM8 Р”РІРёРіР°С‚РµР»СЊ 1
     TIM_TimeBaseStructure.TIM_Period=2000;
     TIM_TimeBaseStructure.TIM_Prescaler = PrescalerValue;
     TIM_TimeBaseStructure.TIM_ClockDivision = 0;
@@ -221,10 +221,10 @@ int main(void)
     TIM_OCInitStructure.TIM_Pulse=380;//
     TIM_OC3Init(TIM8, &TIM_OCInitStructure);
     TIM_OC3PreloadConfig(TIM8, TIM_OCPreload_Enable);
-    // Предзагрузка
+    // РџСЂРµРґР·Р°РіСЂСѓР·РєР°
     TIM_ARRPreloadConfig(TIM8, ENABLE);
     //-----------------------------------------------------------------------
-    // Включение TIM1 и TIM8
+    // Р’РєР»СЋС‡РµРЅРёРµ TIM1 Рё TIM8
     TIM_CtrlPWMOutputs(TIM1, ENABLE);
     TIM_Cmd(TIM1, ENABLE);
 	TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Disable);
@@ -238,7 +238,7 @@ int main(void)
 	TIM_CCxCmd(TIM8, TIM_Channel_3, TIM_CCx_Disable);
     //-----------------------------------------------------------------------
     //-----------------------------------------------------------------------
-    // Двигатель 2, нижние ключи PB13, PB14, PB15
+    // Р”РІРёРіР°С‚РµР»СЊ 2, РЅРёР¶РЅРёРµ РєР»СЋС‡Рё PB13, PB14, PB15
     //-----------------------------------------------------------------------
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 | GPIO_Pin_14| GPIO_Pin_15;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
@@ -247,7 +247,7 @@ int main(void)
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
 	//-----------------------------------------------------------------------
-    // Двигатель 1, нижние ключи PA7, PB0, PB1
+    // Р”РІРёРіР°С‚РµР»СЊ 1, РЅРёР¶РЅРёРµ РєР»СЋС‡Рё PA7, PB0, PB1
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
@@ -264,27 +264,27 @@ int main(void)
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
 	//-----------------------------------------------------------------------
-	// Двигатель 1, вход с компараторов PС0, PС1, PС2
+	// Р”РІРёРіР°С‚РµР»СЊ 1, РІС…РѕРґ СЃ РєРѕРјРїР°СЂР°С‚РѕСЂРѕРІ PРЎ0, PРЎ1, PРЎ2
 	GPIO_InitTypeDef GPIO_InitComparator;
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
 	GPIO_InitComparator.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1 | GPIO_Pin_2;
 	GPIO_InitComparator.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_InitComparator.GPIO_OType = GPIO_OType_PP;
 	GPIO_InitComparator.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitComparator.GPIO_PuPd = GPIO_PuPd_UP;//Подтянуть
+	GPIO_InitComparator.GPIO_PuPd = GPIO_PuPd_UP;//РџРѕРґС‚СЏРЅСѓС‚СЊ
 	GPIO_Init(GPIOC, &GPIO_InitComparator);
 	//-----------------------------------------------------------------------
-	// Двигатель 2, вход с компараторов PС3, PС4, PС5
+	// Р”РІРёРіР°С‚РµР»СЊ 2, РІС…РѕРґ СЃ РєРѕРјРїР°СЂР°С‚РѕСЂРѕРІ PРЎ3, PРЎ4, PРЎ5
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
 	GPIO_InitComparator.GPIO_Pin = GPIO_Pin_3 | GPIO_Pin_4 | GPIO_Pin_5;
 	GPIO_InitComparator.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_InitComparator.GPIO_OType = GPIO_OType_PP;
 	GPIO_InitComparator.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitComparator.GPIO_PuPd = GPIO_PuPd_UP;//Подтянуть
+	GPIO_InitComparator.GPIO_PuPd = GPIO_PuPd_UP;//РџРѕРґС‚СЏРЅСѓС‚СЊ
 	GPIO_Init(GPIOC, &GPIO_InitComparator);
 	//-----------------------------------------------------------------------
 	//-----------------------------------------------------------------------
-	// Настройка USART
+	// РќР°СЃС‚СЂРѕР№РєР° USART
 	GPIO_InitTypeDef  GPIO_InitUSART;
 	USART_InitTypeDef USART_InitUser;
 
@@ -296,8 +296,8 @@ int main(void)
 	GPIO_InitUSART.GPIO_Speed = GPIO_Speed_100MHz;
 	GPIO_InitUSART.GPIO_PuPd = GPIO_PuPd_UP;
 	GPIO_Init(GPIOA, &GPIO_InitUSART);
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_USART2); //Tx Трансивер-Передатчик
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_USART2); //Rx Приемник
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_USART2); //Tx РўСЂР°РЅСЃРёРІРµСЂ-РџРµСЂРµРґР°С‚С‡РёРє
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_USART2); //Rx РџСЂРёРµРјРЅРёРє
 
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
 	USART_InitUser.USART_BaudRate=115200;
@@ -321,11 +321,11 @@ int main(void)
     }
     }
 }
-//Обработчик прерывания юарт
+//РћР±СЂР°Р±РѕС‚С‡РёРє РїСЂРµСЂС‹РІР°РЅРёСЏ СЋР°СЂС‚
 void USART2_IRQHandler(void)
 {
 	//-----------------------------------------------------------------------
-	//Обработчик прерывания на прием с компьютера
+	//РћР±СЂР°Р±РѕС‚С‡РёРє РїСЂРµСЂС‹РІР°РЅРёСЏ РЅР° РїСЂРёРµРј СЃ РєРѕРјРїСЊСЋС‚РµСЂР°
 	if(USART_GetITStatus(USART2, USART_IT_RXNE)==SET)
 	{
 		//-----------------------------------------------------------------------
@@ -334,7 +334,7 @@ void USART2_IRQHandler(void)
 		tmp=Recive_buf[Recive_W];
 		Recive_W++;
 		//-----------------------------------------------------------------------
-		// Поиск конца строки
+		// РџРѕРёСЃРє РєРѕРЅС†Р° СЃС‚СЂРѕРєРё
 		if(tmp=='\r')
 		{
 			 if(strcmp(Recive_buf,"start\r")==0)
@@ -460,7 +460,7 @@ void USART2_IRQHandler(void)
 	}
 }
 //-----------------------------------------------------------------------
-// Функция отправки строчки в юарт
+// Р¤СѓРЅРєС†РёСЏ РѕС‚РїСЂР°РІРєРё СЃС‚СЂРѕС‡РєРё РІ СЋР°СЂС‚
 void str_to_usart(char* str)
 {
 	uint16_t TxCount=0;
@@ -477,23 +477,23 @@ void delay_ms(uint16_t del_temp)
 	while(del_count)
 	{}
 }
-void SysTick_Handler(void) // Таймер 1мс
+void SysTick_Handler(void) // РўР°Р№РјРµСЂ 1РјСЃ
 {
 	if(del_count>0)
 		del_count--;
 	if(delay_timeBLDC1>0)
-		delay_timeBLDC1--; //Отсчет задержки
+		delay_timeBLDC1--; //РћС‚СЃС‡РµС‚ Р·Р°РґРµСЂР¶РєРё
 	if(delay_timeBLDC2>0)
 		delay_timeBLDC2--;
 
-	if(CountStates_ticks < 250) // Считаем 250 мс
+	if(CountStates_ticks < 250) // РЎС‡РёС‚Р°РµРј 250 РјСЃ
 	{
 		CountStates_ticks++;
 	}
 	else
 	{
-		CountStates_ticks = 0; // Если досчитали, то отправляем количество пройденых меток
-		USART_SendData(USART2, CountStates_statesBLDC2);// Для ПИД регулятора
+		CountStates_ticks = 0; // Р•СЃР»Рё РґРѕСЃС‡РёС‚Р°Р»Рё, С‚Рѕ РѕС‚РїСЂР°РІР»СЏРµРј РєРѕР»РёС‡РµСЃС‚РІРѕ РїСЂРѕР№РґРµРЅС‹С… РјРµС‚РѕРє
+		USART_SendData(USART2, CountStates_statesBLDC2);// Р”Р»СЏ РџРР” СЂРµРіСѓР»СЏС‚РѕСЂР°
 		//CountStates_statesBLDC1 = 0;
 		CountStates_statesBLDC2=0;
 	}
@@ -502,24 +502,24 @@ void SysTick_Handler(void) // Таймер 1мс
 }
 
 //-------------------------------------------------------------------------------
-// Управление по обратной ЭДС ДВИГАТЕЛЬ 1
+// РЈРїСЂР°РІР»РµРЅРёРµ РїРѕ РѕР±СЂР°С‚РЅРѕР№ Р­Р”РЎ Р”Р’РР“РђРўР•Р›Р¬ 1
 void control_emf(void)
 {
-		if(delay_timeBLDC1==0) // Если задержка удержания состояния истекла (см счет задержки в таймере)
+		if(delay_timeBLDC1==0) // Р•СЃР»Рё Р·Р°РґРµСЂР¶РєР° СѓРґРµСЂР¶Р°РЅРёСЏ СЃРѕСЃС‚РѕСЏРЅРёСЏ РёСЃС‚РµРєР»Р° (СЃРј СЃС‡РµС‚ Р·Р°РґРµСЂР¶РєРё РІ С‚Р°Р№РјРµСЂРµ)
 		{
-			  if(back_emf_enableBLDC1==0) // Запуск с нуля (двигатель еще не вращали), прокрутим N состояний вручную
+			  if(back_emf_enableBLDC1==0) // Р—Р°РїСѓСЃРє СЃ РЅСѓР»СЏ (РґРІРёРіР°С‚РµР»СЊ РµС‰Рµ РЅРµ РІСЂР°С‰Р°Р»Рё), РїСЂРѕРєСЂСѓС‚РёРј N СЃРѕСЃС‚РѕСЏРЅРёР№ РІСЂСѓС‡РЅСѓСЋ
 				{
-					if(count_step_statesBLDC1==6)// если 84, то 6 коммутаций * 7 пар полюсов * 2 оборот двигателя = число переключений за 2 оборота
-						back_emf_enableBLDC1=1;// Если прокрутили двигатель на N состояний, переходим в режим по обратной ЭДС
+					if(count_step_statesBLDC1==6)// РµСЃР»Рё 84, С‚Рѕ 6 РєРѕРјРјСѓС‚Р°С†РёР№ * 7 РїР°СЂ РїРѕР»СЋСЃРѕРІ * 2 РѕР±РѕСЂРѕС‚ РґРІРёРіР°С‚РµР»СЏ = С‡РёСЃР»Рѕ РїРµСЂРµРєР»СЋС‡РµРЅРёР№ Р·Р° 2 РѕР±РѕСЂРѕС‚Р°
+						back_emf_enableBLDC1=1;// Р•СЃР»Рё РїСЂРѕРєСЂСѓС‚РёР»Рё РґРІРёРіР°С‚РµР»СЊ РЅР° N СЃРѕСЃС‚РѕСЏРЅРёР№, РїРµСЂРµС…РѕРґРёРј РІ СЂРµР¶РёРј РїРѕ РѕР±СЂР°С‚РЅРѕР№ Р­Р”РЎ
 					count_step_statesBLDC1++;
 					if(enable_stateBLDC1>0)
 						enable_stateBLDC1--;
 					if(enable_stateBLDC1==0)
 						enable_stateBLDC1=6;
-					emf_delayBLDC1=26; // Задержка для начального вращения
+					emf_delayBLDC1=26; // Р—Р°РґРµСЂР¶РєР° РґР»СЏ РЅР°С‡Р°Р»СЊРЅРѕРіРѕ РІСЂР°С‰РµРЅРёСЏ
 				}
 				//-------------------------------------------------------------------------------
-				// Не переинициализировать таймер (шим) если состояние не изменилось с предыдущего раза
+				// РќРµ РїРµСЂРµРёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°С‚СЊ С‚Р°Р№РјРµСЂ (С€РёРј) РµСЃР»Рё СЃРѕСЃС‚РѕСЏРЅРёРµ РЅРµ РёР·РјРµРЅРёР»РѕСЃСЊ СЃ РїСЂРµРґС‹РґСѓС‰РµРіРѕ СЂР°Р·Р°
 				if(previous_stateBLDC1 != enable_stateBLDC1)
 				{
 					previous_stateBLDC1 = enable_stateBLDC1;
@@ -527,39 +527,39 @@ void control_emf(void)
 					CountStates_statesBLDC1++;
 				}
 				//-------------------------------------------------------------------------------
-				switch(enable_stateBLDC1) // 6 состояний статора
+				switch(enable_stateBLDC1) // 6 СЃРѕСЃС‚РѕСЏРЅРёР№ СЃС‚Р°С‚РѕСЂР°
 				{
 					//-------------------------------------------------------------------------------
-					// Состояние 1
+					// РЎРѕСЃС‚РѕСЏРЅРёРµ 1
 					case 1:
-						if(back_emf_enableBLDC1)// Если переключились в режим по ЭДС, то начинаем слушать обмотки
+						if(back_emf_enableBLDC1)// Р•СЃР»Рё РїРµСЂРµРєР»СЋС‡РёР»РёСЃСЊ РІ СЂРµР¶РёРј РїРѕ Р­Р”РЎ, С‚Рѕ РЅР°С‡РёРЅР°РµРј СЃР»СѓС€Р°С‚СЊ РѕР±РјРѕС‚РєРё
 						{
-							// Отлавливаем переход фазы U из + в -(перечение средней точки)
-							if(ReadPhase_U1)//Читаем состояние фазы U, (компаратор дает инвертный сигнал)
+							// РћС‚Р»Р°РІР»РёРІР°РµРј РїРµСЂРµС…РѕРґ С„Р°Р·С‹ U РёР· + РІ -(РїРµСЂРµС‡РµРЅРёРµ СЃСЂРµРґРЅРµР№ С‚РѕС‡РєРё)
+							if(ReadPhase_U1)//Р§РёС‚Р°РµРј СЃРѕСЃС‚РѕСЏРЅРёРµ С„Р°Р·С‹ U, (РєРѕРјРїР°СЂР°С‚РѕСЂ РґР°РµС‚ РёРЅРІРµСЂС‚РЅС‹Р№ СЃРёРіРЅР°Р»)
 							{
 								//delay_ms(emf_delay);
-								enable_stateBLDC1=6;  // Назначаем следующее состояние
-								delay_timeBLDC1=emf_delayBLDC1; // Назначаем задержку до перехода в следующее стостояние
+								enable_stateBLDC1=6;  // РќР°Р·РЅР°С‡Р°РµРј СЃР»РµРґСѓСЋС‰РµРµ СЃРѕСЃС‚РѕСЏРЅРёРµ
+								delay_timeBLDC1=emf_delayBLDC1; // РќР°Р·РЅР°С‡Р°РµРј Р·Р°РґРµСЂР¶РєСѓ РґРѕ РїРµСЂРµС…РѕРґР° РІ СЃР»РµРґСѓСЋС‰РµРµ СЃС‚РѕСЃС‚РѕСЏРЅРёРµ
 								break;
 							}
 						}
 
-						if(current_stateBLDC1==0) // Устанавливаем коммутацию обмоток для текущего состояния
+						if(current_stateBLDC1==0) // РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј РєРѕРјРјСѓС‚Р°С†РёСЋ РѕР±РјРѕС‚РѕРє РґР»СЏ С‚РµРєСѓС‰РµРіРѕ СЃРѕСЃС‚РѕСЏРЅРёСЏ
 						{
 							Disable_Ho_U1;
 							Disable_Ho_W1;
-							Enable_Ho_V1; // Фаза V +
+							Enable_Ho_V1; // Р¤Р°Р·Р° V +
 						    //USART_SendData(USART2, 0xF1);
 							Disable_Lo_U1;
 							Disable_Lo_V1;
-							Enable_Lo_W1; // Фаза W -
-							current_stateBLDC1 = 1; // Больше не переопределять настройки ШИМ
+							Enable_Lo_W1; // Р¤Р°Р·Р° W -
+							current_stateBLDC1 = 1; // Р‘РѕР»СЊС€Рµ РЅРµ РїРµСЂРµРѕРїСЂРµРґРµР»СЏС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё РЁРРњ
 						}
 					break;
 					//-------------------------------------------------------------------------------
 
 					//-------------------------------------------------------------------------------
-					// Состояние 2
+					// РЎРѕСЃС‚РѕСЏРЅРёРµ 2
 						case 2:
 							if(back_emf_enableBLDC1)
 							{
@@ -586,7 +586,7 @@ void control_emf(void)
 							break;
 						//-------------------------------------------------------------------------------
 
-					// Состояние 3
+					// РЎРѕСЃС‚РѕСЏРЅРёРµ 3
 					case 3:
 						if(back_emf_enableBLDC1)
 						{
@@ -611,13 +611,13 @@ void control_emf(void)
 						}
 						break;
 					//-------------------------------------------------------------------------------
-					// Состояние 4
+					// РЎРѕСЃС‚РѕСЏРЅРёРµ 4
 					case 4:
-						// Оранжевый провод  E9 фаза U
+						// РћСЂР°РЅР¶РµРІС‹Р№ РїСЂРѕРІРѕРґ  E9 С„Р°Р·Р° U
 						//
 						if(back_emf_enableBLDC1)
 						{
-							if(!ReadPhase_U1)//ждем когда компаратор прыгнет в +
+							if(!ReadPhase_U1)//Р¶РґРµРј РєРѕРіРґР° РєРѕРјРїР°СЂР°С‚РѕСЂ РїСЂС‹РіРЅРµС‚ РІ +
 							{
 								//delay_ms(emf_delay);
 								enable_stateBLDC1=3;
@@ -637,13 +637,13 @@ void control_emf(void)
 						}
 						break;
 					//-------------------------------------------------------------------------------
-					// Состояние 5
+					// РЎРѕСЃС‚РѕСЏРЅРёРµ 5
 					case 5:
 						if(back_emf_enableBLDC1)
 						{
-							// Отлавливаем переход фазы V из - в +
-							// Синий провод E7 фаза V
-							if(ReadPhase_V1) // в -
+							// РћС‚Р»Р°РІР»РёРІР°РµРј РїРµСЂРµС…РѕРґ С„Р°Р·С‹ V РёР· - РІ +
+							// РЎРёРЅРёР№ РїСЂРѕРІРѕРґ E7 С„Р°Р·Р° V
+							if(ReadPhase_V1) // РІ -
 							{
 								//delay_ms(emf_delay);
 								enable_stateBLDC1=4;
@@ -663,7 +663,7 @@ void control_emf(void)
 						}
 						break;
 					//-------------------------------------------------------------------------------
-					// Состояние 6
+					// РЎРѕСЃС‚РѕСЏРЅРёРµ 6
 					case 6:
 						if(back_emf_enableBLDC1)
 						{
@@ -698,14 +698,14 @@ void control_emf(void)
 //-------------------------------------------------------------------------------
 // END void control EMF
 
-// ДВИГАТЕЛЬ 2
+// Р”Р’РР“РђРўР•Р›Р¬ 2
 void control_emf_2(void)
 {
 		if(delay_timeBLDC2==0)
 		{
 			  if(back_emf_enableBLDC2==0)
 				{
-					if(count_step_statesBLDC2==6)// если 84 то 6 коммутаций * 7 пар полюсов * 2 оборот двигателя = число переключений за 2 оборота
+					if(count_step_statesBLDC2==6)// РµСЃР»Рё 84 С‚Рѕ 6 РєРѕРјРјСѓС‚Р°С†РёР№ * 7 РїР°СЂ РїРѕР»СЋСЃРѕРІ * 2 РѕР±РѕСЂРѕС‚ РґРІРёРіР°С‚РµР»СЏ = С‡РёСЃР»Рѕ РїРµСЂРµРєР»СЋС‡РµРЅРёР№ Р·Р° 2 РѕР±РѕСЂРѕС‚Р°
 						back_emf_enableBLDC2=1;
 					count_step_statesBLDC2++;
 					if(enable_stateBLDC2>0)
@@ -716,7 +716,7 @@ void control_emf_2(void)
 					emf_delayBLDC1=26;
 				}
 				//-------------------------------------------------------------------------------
-				// Не переопределять таймер если состояние не изменилось с предыдущего раза
+				// РќРµ РїРµСЂРµРѕРїСЂРµРґРµР»СЏС‚СЊ С‚Р°Р№РјРµСЂ РµСЃР»Рё СЃРѕСЃС‚РѕСЏРЅРёРµ РЅРµ РёР·РјРµРЅРёР»РѕСЃСЊ СЃ РїСЂРµРґС‹РґСѓС‰РµРіРѕ СЂР°Р·Р°
 				if(previous_stateBLDC2 != enable_stateBLDC2)
 				{
 					previous_stateBLDC2 = enable_stateBLDC2;
@@ -727,12 +727,12 @@ void control_emf_2(void)
 				switch(enable_stateBLDC2)
 				{
 					//-------------------------------------------------------------------------------
-					// Состояние 1
+					// РЎРѕСЃС‚РѕСЏРЅРёРµ 1
 					case 1:
 						if(back_emf_enableBLDC2)
 						{
-							// Отлавливаем переход фазы U из + в -(перечение средней точки)
-							if(ReadPhase_U2)//компаратор дает инвертный сигнал
+							// РћС‚Р»Р°РІР»РёРІР°РµРј РїРµСЂРµС…РѕРґ С„Р°Р·С‹ U РёР· + РІ -(РїРµСЂРµС‡РµРЅРёРµ СЃСЂРµРґРЅРµР№ С‚РѕС‡РєРё)
+							if(ReadPhase_U2)//РєРѕРјРїР°СЂР°С‚РѕСЂ РґР°РµС‚ РёРЅРІРµСЂС‚РЅС‹Р№ СЃРёРіРЅР°Р»
 							{
 								//delay_ms(emf_delay);
 								enable_stateBLDC2=6;
@@ -756,7 +756,7 @@ void control_emf_2(void)
 					//-------------------------------------------------------------------------------
 
 					//-------------------------------------------------------------------------------
-					// Состояние 2
+					// РЎРѕСЃС‚РѕСЏРЅРёРµ 2
 						case 2:
 							if(back_emf_enableBLDC2)
 							{
@@ -781,7 +781,7 @@ void control_emf_2(void)
 							break;
 						//-------------------------------------------------------------------------------
 
-					// Состояние 3
+					// РЎРѕСЃС‚РѕСЏРЅРёРµ 3
 					case 3:
 						if(back_emf_enableBLDC2)
 						{
@@ -806,13 +806,13 @@ void control_emf_2(void)
 						}
 						break;
 					//-------------------------------------------------------------------------------
-					// Состояние 4
+					// РЎРѕСЃС‚РѕСЏРЅРёРµ 4
 					case 4:
-						// Оранжевый провод  E9 фаза U
+						// РћСЂР°РЅР¶РµРІС‹Р№ РїСЂРѕРІРѕРґ  E9 С„Р°Р·Р° U
 						//
 						if(back_emf_enableBLDC2)
 						{
-							if(!ReadPhase_U2)//ждем когда компаратор прыгнет в +
+							if(!ReadPhase_U2)//Р¶РґРµРј РєРѕРіРґР° РєРѕРјРїР°СЂР°С‚РѕСЂ РїСЂС‹РіРЅРµС‚ РІ +
 							{
 								//delay_ms(emf_delay);
 								enable_stateBLDC2=3;
@@ -832,13 +832,13 @@ void control_emf_2(void)
 						}
 						break;
 					//-------------------------------------------------------------------------------
-					// Состояние 5
+					// РЎРѕСЃС‚РѕСЏРЅРёРµ 5
 					case 5:
 						if(back_emf_enableBLDC2)
 						{
-							// Отлавливаем переход фазы V из - в +
-							// Синий провод E7 фаза V
-							if(ReadPhase_V2) // в -
+							// РћС‚Р»Р°РІР»РёРІР°РµРј РїРµСЂРµС…РѕРґ С„Р°Р·С‹ V РёР· - РІ +
+							// РЎРёРЅРёР№ РїСЂРѕРІРѕРґ E7 С„Р°Р·Р° V
+							if(ReadPhase_V2) // РІ -
 							{
 								//delay_ms(emf_delay);
 								enable_stateBLDC2=4;
@@ -858,7 +858,7 @@ void control_emf_2(void)
 						}
 						break;
 					//-------------------------------------------------------------------------------
-					// Состояние 6
+					// РЎРѕСЃС‚РѕСЏРЅРёРµ 6
 					case 6:
 						if(back_emf_enableBLDC2)
 						{

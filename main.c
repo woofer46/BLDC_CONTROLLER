@@ -1,35 +1,29 @@
-// Svyatoslav Mishin 2016
+﻿// Svyatoslav Mishin 2016
 // Brushless EMF controllers
 
 #include <stm32f4xx_conf.h>
 
-TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
-TIM_OCInitTypeDef  TIM_OCInitStructure;
-uint16_t PrescalerValue = 0;
-uint16_t del_count=0;
-uint16_t delay_timeBLDC1=0;
-uint16_t delay_timeBLDC2=0;
-uint16_t delay_time=0;
-uint8_t CountStates_ticks = 0;
-uint8_t back_emf=0;
+TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;      // Определение структуры инициализауии таймеров
+TIM_OCInitTypeDef  TIM_OCInitStructure;              // Определение структуры для настройки PWM
+uint16_t PrescalerValue = 0;                         // Определение предделителей для таймеров, ШИМ
+uint16_t del_count=0;                                // Счетчик для фунции delay_ms
+uint16_t delay_timeBLDC1=0;                          // Счетчик задержки коммутирования состояния для бездатчикового управления (Двиг 1)
+uint16_t delay_timeBLDC2=0;                          // --//--//-- (Двиг 2)
+uint8_t CountStates_ticks = 0;                       // Счетчик времение счета прошедших состояний (для регулятора)
 
-
-uint8_t del_tiime_emf = 0;
-
-uint8_t phase_time=0;
 uint8_t Recive_buf[256];
 uint8_t Recive_W=0;
 uint8_t tmp=0;
-uint8_t flag_start=0;
-uint8_t control_emf_enable=0;
+uint8_t flag_start=0;                                // Флаг запуска программы управления по датчикам Холла
+uint8_t control_emf_enable=0;                        // Флаг запуска управления по Обратной ЭДС
 
-uint8_t count_step_statesBLDC1=0;
-uint8_t enable_stateBLDC1 =0;
-uint8_t back_emf_enableBLDC1=0;
-uint8_t current_stateBLDC1 =0;
-uint8_t previous_stateBLDC1 =0;
-uint8_t CountStates_statesBLDC1 = 0;
-uint8_t emf_delayBLDC1=19;//3
+uint8_t count_step_statesBLDC1=0;                    // Количетсво комутаций в холостом режиме (Обр ЭДС)
+uint8_t enable_stateBLDC1 =0;                        // Переменная хранящая текущее состояние 0, 1, 2, 3, 4, 5
+uint8_t back_emf_enableBLDC1=0;                      // Флаг включающий управление по ЭДС, после того как прошел холостой режим
+uint8_t current_stateBLDC1 =0;                       // Флаг того что состояние не изменилось с последнего раза
+uint8_t previous_stateBLDC1 =0;                      // Предыдущее состояние
+uint8_t CountStates_statesBLDC1 = 0;                 // Счетчик количества переключений по состояниям (для регулятора)
+uint8_t emf_delayBLDC1=19;//3                        // Время удержания состояния (Обр Эдс)
 
 uint8_t count_step_statesBLDC2=0;
 uint8_t enable_stateBLDC2 =0;
@@ -38,6 +32,9 @@ uint8_t current_stateBLDC2 =0;
 uint8_t previous_stateBLDC2 =0;
 uint8_t CountStates_statesBLDC2 = 0;
 uint8_t emf_delayBLDC2=19;
+
+uint8_t SetHallControl = 0;                       // Режим управления по датчикам холла Флаг
+uint8_t CurrentHallState =100;                    // Текущее состояние по датчикам холла
 
 void SysTick_Handler(void);
 void delay_ms(uint16_t del_temp);
@@ -106,7 +103,10 @@ void disable_tim_chanels(void);
 #define Enable_Lo_V2 GPIO_SetBits(GPIOB, GPIO_Pin_14);
 #define Enable_Lo_W2 GPIO_SetBits(GPIOB, GPIO_Pin_15);
 
-
+// Чтение состояний датчиков холла для двигателя 1
+#define ReadStateHall1Motor1 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_2)
+#define ReadStateHall2Motor1 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_3)
+#define ReadStateHall3Motor1 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_4)
 
 int main(void)
 {
@@ -283,6 +283,13 @@ int main(void)
 	GPIO_InitComparator.GPIO_PuPd = GPIO_PuPd_UP;//Подтянуть
 	GPIO_Init(GPIOC, &GPIO_InitComparator);
 	//-----------------------------------------------------------------------
+	// Вход с датчиков Холла, двигатель 1
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3 | GPIO_Pin_4;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
 	//-----------------------------------------------------------------------
 	// Настройка USART
 	GPIO_InitTypeDef  GPIO_InitUSART;
@@ -313,12 +320,16 @@ int main(void)
 	//-------------------------------------------------------------------------------
 	str_to_usart("Program is ready\n\r");
     while(1)
-    {	//str_to_usart("P");
-    if(control_emf_enable)
     {
-    control_emf();
-    control_emf_2();
-    }
+		if(control_emf_enable)
+		{
+			control_emf();
+			control_emf_2();
+		}
+		if(SetHallControl==1)
+		{
+			control_hall_motor1();
+		}
     }
 }
 //Обработчик прерывания юарт
@@ -339,17 +350,10 @@ void USART2_IRQHandler(void)
 		{
 			 if(strcmp(Recive_buf,"start\r")==0)
 				{
-					//flag_start=1;
-					//Speed200_1;
-					//Speed200_2;
-					//Speed200_3;
-					//Speed1000_1;
-					//Speed1000_2;
-					//Speed1000_3;
-
-					str_to_usart("Program start\r");//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+					str_to_usart("Program start\r");
 					memset(Recive_buf, 0, sizeof(Recive_buf));
 					Recive_W=0;
+					SetHallControl=1;
 				}
 
 			else if(strcmp(Recive_buf,"stop\r")==0)
@@ -363,14 +367,14 @@ void USART2_IRQHandler(void)
 
 			else if(strcmp(Recive_buf,"Speed400\r")==0)
 				{
-						str_to_usart("Speed 400\n\r");
-						Speed400_1;
-						Speed400_2;
-						Speed400_3;
-						emf_delayBLDC1=8;
-						emf_delayBLDC2=8;
-				memset(Recive_buf, 0, sizeof(Recive_buf));
-				Recive_W=0;
+					str_to_usart("Speed 400\n\r");
+					Speed400_1;
+					Speed400_2;
+					Speed400_3;
+					emf_delayBLDC1=8;
+					emf_delayBLDC2=8;
+					memset(Recive_buf, 0, sizeof(Recive_buf));
+					Recive_W=0;
 				}
 
 			else if(strcmp(Recive_buf,"Speed200\r")==0)
@@ -431,7 +435,7 @@ void USART2_IRQHandler(void)
 				{
 				 	//if(flag_start)
 				 	//{
-						str_to_usart("EMF\n\r");//////////////////////////////!!!!!!!!!!!!!
+						str_to_usart("EMF\n\r");
 				 		//Speed1000_1;
 				 		//Speed1000_2;
 				 		//Speed1000_3;
@@ -497,10 +501,94 @@ void SysTick_Handler(void) // Таймер 1мс
 		//CountStates_statesBLDC1 = 0;
 		CountStates_statesBLDC2=0;
 	}
-
-
 }
 
+//-------------------------------------------------------------------------------
+// Управление по датчикам холла ДВИГАТЕЛЬ 1
+void control_hall_motor1(void)
+{
+	if(SetHallControl==1)
+	{
+		if(ReadStateHall1Motor1 == 0 && ReadStateHall2Motor1 == 0 && ReadStateHall1Motor1 == 1)
+		{
+			if(CurrentHallState!=1)
+			{
+				Disable_Ho_U1;
+				Disable_Ho_W1;
+				Enable_Ho_V1; // V +
+				Disable_Lo_U1;
+				Disable_Lo_V1;
+				Enable_Lo_W1; // W -
+				CurrentHallState=1;
+			}
+		}
+		else if(ReadStateHall1Motor1 == 0 && ReadStateHall2Motor1 == 1 && ReadStateHall1Motor1 == 1)
+		{
+			if(CurrentHallState!=2)
+			{
+				Disable_Ho_V1;
+				Disable_Ho_W1;
+				Enable_Ho_U1;   // U +
+				Disable_Lo_U1;
+				Disable_Lo_V1;
+				Enable_Lo_W1;   // W -
+				CurrentHallState=2;
+			}
+		}
+		else if(ReadStateHall1Motor1 == 0 && ReadStateHall2Motor1 == 1 && ReadStateHall1Motor1 == 0)
+		{
+			if(CurrentHallState!=3)
+			{
+				Disable_Ho_V1;
+				Disable_Ho_W1;
+				Enable_Ho_U1;    // U +
+				Disable_Lo_W1;
+				Disable_Lo_U1;
+				Enable_Lo_V1;    // V -
+				CurrentHallState=2;
+			}
+		}
+		else if(ReadStateHall1Motor1 == 1 && ReadStateHall2Motor1 == 1 && ReadStateHall1Motor1 == 0)
+		{
+			if(CurrentHallState!=4)
+			{
+				Disable_Ho_U1;
+				Disable_Ho_V1;
+				Enable_Ho_W1;    // W +
+				Disable_Lo_W1;
+				Disable_Lo_U1;
+				Enable_Lo_V1;    // V -
+				CurrentHallState=4;
+			}
+		}
+		else if(ReadStateHall1Motor1 == 1 && ReadStateHall2Motor1 == 0 && ReadStateHall1Motor1 == 0)
+		{
+			if(CurrentHallState!=5)
+			{
+				Disable_Ho_U1;
+				Disable_Ho_V1;
+				Enable_Ho_W1;    // W +
+				Disable_Lo_W1;
+				Disable_Lo_V1;
+				Enable_Lo_U1;    // U -
+				CurrentHallState=5;
+			}
+		}
+		else if(ReadStateHall1Motor1 == 1 && ReadStateHall2Motor1 == 0 && ReadStateHall1Motor1 == 1)
+		{
+			if(CurrentHallState!=6)
+			{
+				Disable_Ho_U1;
+				Disable_Ho_W1;
+				Enable_Ho_V1;    // V +
+				Disable_Lo_W1;
+				Disable_Lo_V1;
+				Enable_Lo_U1;    // U -
+				CurrentHallState=6;
+			}
+		}
+	}
+}
 //-------------------------------------------------------------------------------
 // Управление по обратной ЭДС ДВИГАТЕЛЬ 1
 void control_emf(void)
@@ -677,7 +765,6 @@ void control_emf(void)
 						}
 						if(current_stateBLDC1==0)
 						{
-							//del_tiime_emf=0;
 							Disable_Ho_U1;
 							Disable_Ho_W1;
 							Enable_Ho_V1;
@@ -754,8 +841,6 @@ void control_emf_2(void)
 						}
 					break;
 					//-------------------------------------------------------------------------------
-
-					//-------------------------------------------------------------------------------
 					// Состояние 2
 						case 2:
 							if(back_emf_enableBLDC2)
@@ -779,8 +864,7 @@ void control_emf_2(void)
 								current_stateBLDC2 = 1;
 							}
 							break;
-						//-------------------------------------------------------------------------------
-
+					//-------------------------------------------------------------------------------
 					// Состояние 3
 					case 3:
 						if(back_emf_enableBLDC2)
@@ -872,7 +956,6 @@ void control_emf_2(void)
 						}
 						if(current_stateBLDC2==0)
 						{
-							//del_tiime_emf=0;
 							Disable_Ho_U2;
 							Disable_Ho_W2;
 							Enable_Ho_V2;

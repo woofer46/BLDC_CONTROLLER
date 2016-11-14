@@ -33,6 +33,10 @@ uint8_t previous_stateBLDC2 =0;
 uint8_t CountStates_statesBLDC2 = 0;
 uint8_t emf_delayBLDC2=19;
 
+uint8_t hallph1;
+uint8_t hallph2;
+uint8_t hallph3;
+
 uint8_t SetHallControl = 0;                       // Режим управления по датчикам холла Флаг
 uint8_t CurrentHallState =100;                    // Текущее состояние по датчикам холла
 
@@ -289,7 +293,7 @@ int main(void)
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
-	GPIO_Init(GPIOC, &GPIO_InitStructure);
+	GPIO_Init(GPIOD, &GPIO_InitStructure);
 	//-----------------------------------------------------------------------
 	// Настройка USART
 	GPIO_InitTypeDef  GPIO_InitUSART;
@@ -363,6 +367,7 @@ void USART2_IRQHandler(void)
 					str_to_usart("Program stop\r");
 					memset(Recive_buf, 0, sizeof(Recive_buf));
 					Recive_W=0;
+					SetHallControl=0;
 				}
 
 			else if(strcmp(Recive_buf,"Speed400\r")==0)
@@ -509,7 +514,11 @@ void control_hall_motor1(void)
 {
 	if(SetHallControl==1)
 	{
-		if(ReadStateHall1Motor1 == 0 && ReadStateHall2Motor1 == 0 && ReadStateHall1Motor1 == 1)
+		hallph1=ReadStateHall1Motor1;
+		hallph2=ReadStateHall2Motor1;
+		hallph3=ReadStateHall3Motor1;
+
+		if(ReadStateHall1Motor1 == 0 && ReadStateHall2Motor1 == 0 && ReadStateHall3Motor1 == 1)
 		{
 			if(CurrentHallState!=1)
 			{
@@ -522,7 +531,7 @@ void control_hall_motor1(void)
 				CurrentHallState=1;
 			}
 		}
-		else if(ReadStateHall1Motor1 == 0 && ReadStateHall2Motor1 == 1 && ReadStateHall1Motor1 == 1)
+		else if(ReadStateHall1Motor1 == 0 && ReadStateHall2Motor1 == 1 && ReadStateHall3Motor1 == 1)
 		{
 			if(CurrentHallState!=2)
 			{
@@ -535,7 +544,7 @@ void control_hall_motor1(void)
 				CurrentHallState=2;
 			}
 		}
-		else if(ReadStateHall1Motor1 == 0 && ReadStateHall2Motor1 == 1 && ReadStateHall1Motor1 == 0)
+		else if(ReadStateHall1Motor1 == 0 && ReadStateHall2Motor1 == 1 && ReadStateHall3Motor1 == 0)
 		{
 			if(CurrentHallState!=3)
 			{
@@ -548,7 +557,7 @@ void control_hall_motor1(void)
 				CurrentHallState=2;
 			}
 		}
-		else if(ReadStateHall1Motor1 == 1 && ReadStateHall2Motor1 == 1 && ReadStateHall1Motor1 == 0)
+		else if(ReadStateHall1Motor1 == 1 && ReadStateHall2Motor1 == 1 && ReadStateHall3Motor1 == 0)
 		{
 			if(CurrentHallState!=4)
 			{
@@ -561,7 +570,7 @@ void control_hall_motor1(void)
 				CurrentHallState=4;
 			}
 		}
-		else if(ReadStateHall1Motor1 == 1 && ReadStateHall2Motor1 == 0 && ReadStateHall1Motor1 == 0)
+		else if(ReadStateHall1Motor1 == 1 && ReadStateHall2Motor1 == 0 && ReadStateHall3Motor1 == 0)
 		{
 			if(CurrentHallState!=5)
 			{
@@ -574,7 +583,7 @@ void control_hall_motor1(void)
 				CurrentHallState=5;
 			}
 		}
-		else if(ReadStateHall1Motor1 == 1 && ReadStateHall2Motor1 == 0 && ReadStateHall1Motor1 == 1)
+		else if(ReadStateHall1Motor1 == 1 && ReadStateHall2Motor1 == 0 && ReadStateHall3Motor1 == 1)
 		{
 			if(CurrentHallState!=6)
 			{

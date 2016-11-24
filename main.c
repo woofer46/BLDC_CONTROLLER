@@ -1,5 +1,6 @@
-﻿// Svyatoslav Mishin 2016
+﻿// Svyatoslav Mishin 2014-2016
 // Brushless EMF controllers
+// Anton Proskunin 2016
 
 #include <stm32f4xx_conf.h>
 
@@ -11,8 +12,9 @@ uint16_t delay_timeBLDC1=0;                          // Счетчик заде�
 uint16_t delay_timeBLDC2=0;                          // --//--//-- (Двиг 2)
 uint8_t CountStates_ticks = 0;                       // Счетчик времение счета прошедших состояний (для регулятора)
 
-uint8_t Recive_buf[256];
-uint8_t Recive_W=0;
+uint8_t Receive_buf[256];
+uint8_t Temp_buf[5];
+uint8_t Receive=0;
 uint8_t tmp=0;
 uint8_t flag_start=0;                                // Флаг запуска программы управления по датчикам Холла
 uint8_t control_emf_enable=0;                        // Флаг запуска управления по Обратной ЭДС
@@ -37,6 +39,18 @@ uint8_t emf_delayBLDC2=19;
 uint8_t hallph1;
 uint8_t hallph2;
 uint8_t hallph3;
+
+uint8_t LeftSpeed=0;
+uint8_t RightSpeed=0;
+
+uint16_t BufFill=0;
+uint16_t BufRd=0;
+
+uint16_t tBufFill=0;
+uint16_t tBufRd=0;
+uint16_t BufWr=0;
+
+uint8_t DriveMode=0;
 
 
 uint8_t SetHallControl = 1;                       // Режим управления по датчикам холла Флаг
@@ -332,12 +346,12 @@ int main(void)
 	str_to_usart("Program is ready\n\r");
     while(1)
     {
-		if(control_emf_enable)
+		if(DriveMode==0x02)
 		{
 			control_emf();
 			control_emf_2();
 		}
-		if(SetHallControl==1)
+		if(DriveMode==0x01) // Hall enable
 		{
 			control_hall_motor1();
 		}
@@ -352,138 +366,52 @@ void USART2_IRQHandler(void)
 	{
 		//-----------------------------------------------------------------------
 		USART_ClearITPendingBit(USART2,USART_IT_RXNE);
-		Recive_buf[Recive_W] = USART_ReceiveData(USART2);
-		tmp=Recive_buf[Recive_W];
-		Recive_W++;
-		//-----------------------------------------------------------------------
-		// Поиск конца строки
-		if(tmp=='\r')
-		{
-			 if(strcmp(Recive_buf,"start\r")==0)
-				{
-					str_to_usart("Program start\r");
-					memset(Recive_buf, 0, sizeof(Recive_buf));
-					Recive_W=0;
-					SetHallControl=1;
-				}
-
-			else if(strcmp(Recive_buf,"stop\r")==0)
-				{
-					flag_start=0;
-					disable_tim_chanels();
-					str_to_usart("Program stop\r");
-					memset(Recive_buf, 0, sizeof(Recive_buf));
-					Recive_W=0;
-					SetHallControl=0;
-				}
-
-			else if(strcmp(Recive_buf,"Speed400\r")==0)
-				{
-					str_to_usart("Speed 400\n\r");
-					Speed400_1;
-					Speed400_2;
-					Speed400_3;
-					emf_delayBLDC1=8;
-					emf_delayBLDC2=8;
-					memset(Recive_buf, 0, sizeof(Recive_buf));
-					Recive_W=0;
-				}
-
-			else if(strcmp(Recive_buf,"Speed200\r")==0)
-				{
-				 	if(flag_start)
-				 	{
-						str_to_usart("Speed 200\n\r");
-						Speed200_1;
-						Speed200_2;
-						Speed200_3;
-						emf_delayBLDC1=15;
-					}
-					else
-					{
-						str_to_usart("First start motor\n\r");
-					}
-
-				memset(Recive_buf, 0, sizeof(Recive_buf));
-				Recive_W=0;
-				}
-
-			else if(strcmp(Recive_buf,"Speed900\r")==0)
-				{
-				 	//if(flag_start)
-				 	{
-						str_to_usart("Speed 900\n\r");
-						Speed900_1;
-						Speed900_2;
-						Speed900_3;
-						emf_delayBLDC1=3;
-				 	}
-					//else
-					{
-						//str_to_usart("First start motor\n\r");
-					}
-
-				memset(Recive_buf, 0, sizeof(Recive_buf));
-				Recive_W=0;
-				}
-
-			else if(strcmp(Recive_buf,"Speed1000\r")==0)
-				{
-						str_to_usart("Speed 1000\n\r");
-						Speed1000_1;
-						Speed1000_2;
-						Speed1000_3;
-
-				//	else
-					{
-					//	str_to_usart("First start motor\n\r");
-					}
-
-				memset(Recive_buf, 0, sizeof(Recive_buf));
-				Recive_W=0;
-				}
-
-			/*else if(strcmp(Recive_buf,"EMF\r")==0)
-				{
-				 	//if(flag_start)
-				 	//{
-						str_to_usart("EMF\n\r");
-				 		//Speed1000_1;
-				 		//Speed1000_2;
-				 		//Speed1000_3;
-						control_emf_enable=1;
-
-					//}
-					//else
-					{
-						//str_to_usart("First start motor\n\r");
-					}
-
-				memset(Recive_buf, 0, sizeof(Recive_buf));
-				Recive_W=0;
-				}*/
-			/*else if(strcmp(Recive_buf,"Speedxxx"))
+		Receive_buf[BufWr] = USART_ReceiveData(USART2);// Закидываем байт в буфер
+		BufFill++;                                    // Говорим что его размер увеличился на 1
+		BufWr++;                                      // Чтобы следуюющий пришедший байт не перетер этот смещаем индекс на 1
+		tBufFill=BufFill; // Временная переменная для поиска 5 байт
+		tBufRd=BufRd;
+		while(BufFill>=5) // Если в буфере 5 байт или больше
+		{ 	
+			Receive=0; // счетчик байтов
+			while(Receive<=5) // Заберем 5 байт
 			{
-
+				Temp_buf[Receive]=Receive_buf[tBufRd];
+				Receive++;
+				tBufFill--;
+				tBufRd++;
+				if(tBufRd==256) // Если мы прочитали 255й байт из массива, то следующий должен быть 0й индекс массива
+				{
+					tBufRd=0;
+				}
 			}
-
-			else if (strcmp(Recive_buf))
+			// Теперь проверим что это наш пакет  0б - 0х00, 1б - скорость лево, 2б - скорость право, 3б - режим, 4б - \n, 5б - \r
+			//                                  0x0A                   0x0D
+			if((Temp_buf[0]==0x00)&&(Temp_buf[4]=='\n')&&(Temp_buf[5]=='\r'))  // ищем наш опозновательный знак
 			{
-
-			}*/
-
-			else
+				LeftSpeed=Temp_buf[1]; // Забираем скорость
+				RightSpeed=Temp_buf[2];
+				TIM_SetCompare1(TIM4, ((LeftSpeed&FE)>>1)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
+				TIM_SetCompare1(TIM8, ((RightSpeed&FE)>>1)*15);
+				DriveMode=Temp_buf[3];//0x01 - Hall, 0x02 - EMF, 0x00 - Disable
+				BufFill=tBufFill; // Присвоем текущие значения
+				BufRd=tBufRd;
+			}
+			else // если опозновательный не найден сместимся на один байт
+			{
+				BufRd=BufRd+1;
+				if(BufRd>=256)
 				{
-				str_to_usart("You send: ");
-				str_to_usart(Recive_buf);
-				str_to_usart("But command undeclared.\r");
-				memset(Recive_buf, 0, sizeof(Recive_buf));
-				Recive_W=0;
+					BufRd=0;
 				}
-
-
+				BufFill=BufFill-1;
+			}
 		}
-	//-----------------------------------------------------------------------
+		if(BufWr>=255)// Конец массива закольцуем на начало
+		{
+			BufWr=0;
+		}
+		//-----------------------------------------------------------------------
 	}
 }
 //-----------------------------------------------------------------------

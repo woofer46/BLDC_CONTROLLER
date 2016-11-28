@@ -28,7 +28,7 @@ uint8_t previous_stateBLDC1 =0;                      // Предыдущее с�
 uint8_t CountStates_statesBLDC1 = 0;                 // Счетчик количества переключений по состояниям (для регулятора)
 uint8_t emf_delayBLDC1=19;//3                        // Время удержания состояния (Обр Эдс)
 uint16_t HallCounter = 0;							// Счетчик тиков состояния
-uint16_t SpeedSendTime = 0;
+uint16_t SpeedSendTime = 0;							// тестируем измерение скорости
 uint8_t count_step_statesBLDC2=0;
 uint8_t enable_stateBLDC2 =0;
 uint8_t back_emf_enableBLDC2=0;
@@ -36,6 +36,11 @@ uint8_t current_stateBLDC2 =0;
 uint8_t previous_stateBLDC2 =0;
 uint8_t CountStates_statesBLDC2 = 0;
 uint8_t emf_delayBLDC2=19;
+uint8_t ControlMode = 0x00;
+uint8_t WayLength = 0;
+uint8_t CountOfRound = 0;
+
+
 
 uint8_t hallph1;
 uint8_t hallph2;
@@ -55,7 +60,7 @@ uint8_t DriveMode=0;
 
 
 uint8_t SetHallControl = 1;                       // Режим управления по датчикам холла Флаг
-uint8_t CurrentHallState =100;                    // Текущее состояние по датчикам холла
+uint8_t CurrentHallState = 100;                    // Текущее состояние по датчикам холла
 
 void SysTick_Handler(void);
 void delay_ms(uint16_t del_temp);
@@ -79,6 +84,10 @@ void disable_tim_chanels(void);
 #define Speed1000_1 TIM_SetCompare1(TIM4, 2000)
 #define Speed1000_2 TIM_SetCompare2(TIM4, 2000)
 #define Speed1000_3 TIM_SetCompare3(TIM4, 2000)*/
+
+#define SpeedMode 0x00
+#define WayMode 0x01
+#define AngleMode 0x02
 
 //Двигатель 1
 #define ReadPhase_U1 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_0)
@@ -389,47 +398,91 @@ void USART2_IRQHandler(void)
 			}
 			// Теперь проверим что это наш пакет  0б - 0х00, 1б - скорость лево, 2б - скорость право, 3б - режим, 4б - \n, 5б - \r
 			//                                  0x0A                   0x0D
-			if((Temp_buf[0]==0x00)&&(Temp_buf[4]=='\n')&&(Temp_buf[5]=='\r'))  // ищем наш опозновательный знак
+			ControlMode = Temp_buf[0];
+			if((Temp_buf[4]=='\n')&&(Temp_buf[5]=='\r'))  // ищем наш опозновательный знак
 			{
-				LeftSpeed=Temp_buf[1]; // Забираем скорость
-				RightSpeed=Temp_buf[2];
+				switch(ControlMode)
+				{
+					case SpeedMode:
 
-				int tmp = ((LeftSpeed&0xFE)>>1)*15;
-				char buf[13] = {'L',0,0,0,0,'R',0,0,0,0, '\n','\r',0};
+								LeftSpeed=Temp_buf[1]; // Забираем скорость
+								RightSpeed=Temp_buf[2];
 
-				buf[1] = (tmp%10000)/1000 + 48;
-				buf[2] = (tmp%1000)/100 + 48;
-				buf[3] = (tmp%100)/10 + 48;
-				buf[4] = (tmp%10) + 48;
+								int tmp = ((LeftSpeed&0xFE)>>1)*15;
+								char buf[13] = {'L',0,0,0,0,'R',0,0,0,0, '\n','\r',0};
 
-				tmp = ((RightSpeed&0xFE)>>1)*15;
+								buf[1] = (tmp%10000)/1000 + 48;
+								buf[2] = (tmp%1000)/100 + 48;
+								buf[3] = (tmp%100)/10 + 48;
+								buf[4] = (tmp%10) + 48;
 
-				buf[6] = (tmp%10000)/1000 + 48;
-				buf[7] = (tmp%1000)/100 + 48;
-				buf[8] = (tmp%100)/10 + 48;
-				buf[9] = tmp%10 + 48;
+								tmp = ((RightSpeed&0xFE)>>1)*15;
 
-				//str_to_usart(buf);
+								buf[6] = (tmp%10000)/1000 + 48;
+								buf[7] = (tmp%1000)/100 + 48;
+								buf[8] = (tmp%100)/10 + 48;
+								buf[9] = tmp%10 + 48;
 
-				TIM_SetCompare1(TIM4, ((LeftSpeed&0xFE)>>1)*15);
-				TIM_SetCompare2(TIM4, ((LeftSpeed&0xFE)>>1)*15);
-				TIM_SetCompare3(TIM4, ((LeftSpeed&0xFE)>>1)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
-				TIM_SetCompare1(TIM8, ((RightSpeed&0xFE)>>1)*15);
-				TIM_SetCompare2(TIM8, ((RightSpeed&0xFE)>>1)*15);
-				TIM_SetCompare3(TIM8, ((RightSpeed&0xFE)>>1)*15);
+								//str_to_usart(buf);
 
-				DriveMode=Temp_buf[3];//0x01 - Hall, 0x02 - EMF, 0x00 - Disable
+								TIM_SetCompare1(TIM4, ((LeftSpeed&0xFE)>>1)*15);
+								TIM_SetCompare2(TIM4, ((LeftSpeed&0xFE)>>1)*15);
+								TIM_SetCompare3(TIM4, ((LeftSpeed&0xFE)>>1)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
+								TIM_SetCompare1(TIM8, ((RightSpeed&0xFE)>>1)*15);
+								TIM_SetCompare2(TIM8, ((RightSpeed&0xFE)>>1)*15);
+								TIM_SetCompare3(TIM8, ((RightSpeed&0xFE)>>1)*15);
 
-				BufFill=tBufFill; // Присвоем текущие значения
-				BufRd=tBufRd;
-			}
+								DriveMode=Temp_buf[3];//0x01 - Hall, 0x02 - EMF, 0x00 - Disable
 
-			/*else if(ускорение, положение, и тд)
-			{
+								BufFill=tBufFill; // Присвоем текущие значения
+								BufRd=tBufRd;
+							}
+						break;
 
-			}*/
+					case WayMode:
+						LeftSpeed=Temp_buf[2]; // Забираем скорость
+						RightSpeed=Temp_buf[2];
 
-			else // если опозновательный не найден сместимся на один байт
+						TIM_SetCompare1(TIM4, ((LeftSpeed&0xFE)>>1)*15);
+						TIM_SetCompare2(TIM4, ((LeftSpeed&0xFE)>>1)*15);
+						TIM_SetCompare3(TIM4, ((LeftSpeed&0xFE)>>1)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
+						TIM_SetCompare1(TIM8, ((RightSpeed&0xFE)>>1)*15);
+						TIM_SetCompare2(TIM8, ((RightSpeed&0xFE)>>1)*15);
+						TIM_SetCompare3(TIM8, ((RightSpeed&0xFE)>>1)*15);
+
+						WayLength = Temp_buf[1]; //дописать формулу для длины исходя из количетсва оборотов колеса
+
+
+						break;
+
+					case RoundMode:
+						LeftSpeed=Temp_buf[2]; // Забираем скорость
+						RightSpeed=Temp_buf[2];
+
+						TIM_SetCompare1(TIM4, ((LeftSpeed&0xFE)>>1)*15);
+						TIM_SetCompare2(TIM4, ((LeftSpeed&0xFE)>>1)*15);
+						TIM_SetCompare3(TIM4, ((LeftSpeed&0xFE)>>1)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
+						TIM_SetCompare1(TIM8, ((RightSpeed&0xFE)>>1)*15);
+						TIM_SetCompare2(TIM8, ((RightSpeed&0xFE)>>1)*15);
+						TIM_SetCompare3(TIM8, ((RightSpeed&0xFE)>>1)*15);
+
+						CountOfRounds = Temp_buf[1];
+						break;
+
+					default:
+						BufRd=BufRd+1;
+						if(BufRd>=256)
+						{
+							BufRd=0;
+						}
+						BufFill=BufFill-1;
+						break;
+
+				}
+		}
+
+
+			/*else // если опозновательный не найден сместимся на один байт
 			{
 				BufRd=BufRd+1;
 				if(BufRd>=256)
@@ -437,7 +490,7 @@ void USART2_IRQHandler(void)
 					BufRd=0;
 				}
 				BufFill=BufFill-1;
-			}
+			}*/
 		}
 		if(BufWr>=255)// Конец массива закольцуем на начало
 		{

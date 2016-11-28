@@ -1,6 +1,7 @@
 ﻿// Svyatoslav Mishin 2014-2016
 // Brushless EMF controllers
 // Anton Proskunin 2016
+// Andrey Pushin 2016
 
 #include <stm32f4xx_conf.h>
 
@@ -13,7 +14,7 @@ uint16_t delay_timeBLDC2=0;                          // --//--//-- (Двиг 2)
 uint8_t CountStates_ticks = 0;                       // Счетчик времение счета прошедших состояний (для регулятора)
 
 uint8_t Receive_buf[256];
-uint8_t Temp_buf[5];
+uint8_t Temp_buf[6];
 uint8_t Receive=0;
 uint8_t tmp=0;
 uint8_t flag_start=0;                                // Флаг запуска программы управления по датчикам Холла
@@ -26,8 +27,8 @@ uint8_t current_stateBLDC1 =0;                       // Флаг того что
 uint8_t previous_stateBLDC1 =0;                      // Предыдущее состояние
 uint8_t CountStates_statesBLDC1 = 0;                 // Счетчик количества переключений по состояниям (для регулятора)
 uint8_t emf_delayBLDC1=19;//3                        // Время удержания состояния (Обр Эдс)
-uint8_t HallSwitchTime = 0;							// Время переключения между состояниями датчика Холла
-
+uint16_t HallCounter = 0;							// Счетчик тиков состояния
+uint16_t SpeedSendTime = 0;
 uint8_t count_step_statesBLDC2=0;
 uint8_t enable_stateBLDC2 =0;
 uint8_t back_emf_enableBLDC2=0;
@@ -63,7 +64,7 @@ void str_to_usart(char* str);
 void control_emf(void);
 void disable_tim_chanels(void);
 
-#define Speed200_1 TIM_SetCompare1(TIM8, 400)
+/*#define Speed200_1 TIM_SetCompare1(TIM8, 400)
 #define Speed200_2 TIM_SetCompare2(TIM8, 400)
 #define Speed200_3 TIM_SetCompare3(TIM8, 400)
 
@@ -77,7 +78,7 @@ void disable_tim_chanels(void);
 
 #define Speed1000_1 TIM_SetCompare1(TIM4, 2000)
 #define Speed1000_2 TIM_SetCompare2(TIM4, 2000)
-#define Speed1000_3 TIM_SetCompare3(TIM4, 2000)
+#define Speed1000_3 TIM_SetCompare3(TIM4, 2000)*/
 
 //Двигатель 1
 #define ReadPhase_U1 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_0)
@@ -371,12 +372,13 @@ void USART2_IRQHandler(void)
 		BufWr++;                                      // Чтобы следуюющий пришедший байт не перетер этот смещаем индекс на 1
 		tBufFill=BufFill; // Временная переменная для поиска 5 байт
 		tBufRd=BufRd;
-		while(BufFill>=5) // Если в буфере 5 байт или больше
+		while(BufFill>=6) // Если в буфере 5 байт или больше
 		{ 	
 			Receive=0; // счетчик байтов
 			while(Receive<=5) // Заберем 5 байт
 			{
 				Temp_buf[Receive]=Receive_buf[tBufRd];
+				// Receive_buf[tBufRd] = 0;
 				Receive++;
 				tBufFill--;
 				tBufRd++;
@@ -391,12 +393,42 @@ void USART2_IRQHandler(void)
 			{
 				LeftSpeed=Temp_buf[1]; // Забираем скорость
 				RightSpeed=Temp_buf[2];
-				TIM_SetCompare1(TIM4, ((LeftSpeed&FE)>>1)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
-				TIM_SetCompare1(TIM8, ((RightSpeed&FE)>>1)*15);
+
+				int tmp = ((LeftSpeed&0xFE)>>1)*15;
+				char buf[13] = {'L',0,0,0,0,'R',0,0,0,0, '\n','\r',0};
+
+				buf[1] = (tmp%10000)/1000 + 48;
+				buf[2] = (tmp%1000)/100 + 48;
+				buf[3] = (tmp%100)/10 + 48;
+				buf[4] = (tmp%10) + 48;
+
+				tmp = ((RightSpeed&0xFE)>>1)*15;
+
+				buf[6] = (tmp%10000)/1000 + 48;
+				buf[7] = (tmp%1000)/100 + 48;
+				buf[8] = (tmp%100)/10 + 48;
+				buf[9] = tmp%10 + 48;
+
+				//str_to_usart(buf);
+
+				TIM_SetCompare1(TIM4, ((LeftSpeed&0xFE)>>1)*15);
+				TIM_SetCompare2(TIM4, ((LeftSpeed&0xFE)>>1)*15);
+				TIM_SetCompare3(TIM4, ((LeftSpeed&0xFE)>>1)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
+				TIM_SetCompare1(TIM8, ((RightSpeed&0xFE)>>1)*15);
+				TIM_SetCompare2(TIM8, ((RightSpeed&0xFE)>>1)*15);
+				TIM_SetCompare3(TIM8, ((RightSpeed&0xFE)>>1)*15);
+
 				DriveMode=Temp_buf[3];//0x01 - Hall, 0x02 - EMF, 0x00 - Disable
+
 				BufFill=tBufFill; // Присвоем текущие значения
 				BufRd=tBufRd;
 			}
+
+			/*else if(ускорение, положение, и тд)
+			{
+
+			}*/
+
 			else // если опозновательный не найден сместимся на один байт
 			{
 				BufRd=BufRd+1;
@@ -440,7 +472,19 @@ void SysTick_Handler(void) // Таймер 1мс
 		delay_timeBLDC1--; //Отсчет задержки
 	if(delay_timeBLDC2>0)
 		delay_timeBLDC2--;
-	HallSwitchTime++;
+	SpeedSendTime++;
+
+	if(SpeedSendTime == 200)
+	{
+		int CurrentSpeed = 300*HallCounter/14;
+		char buf[6] = {0,0,0,'\n','\r',0};
+		buf[0] = CurrentSpeed%1000/100 + 48;
+		buf[1] = (CurrentSpeed%100)/10 + 48;
+		buf[2] = CurrentSpeed%10 + 48;
+		str_to_usart(buf);
+		SpeedSendTime = 0;
+		HallCounter = 0;
+	}
 	if(CountStates_ticks < 250) // Считаем 250 мс
 	{
 		CountStates_ticks++;
@@ -458,7 +502,7 @@ void SysTick_Handler(void) // Таймер 1мс
 // Управление по датчикам холла ДВИГАТЕЛЬ 1
 void control_hall_motor1(void)
 {
-	if(SetHallControl==1)
+	if(SetHallControl==1) // дополнительный флаг
 	{
 		hallph1=ReadStateHall1Motor1;
 		hallph2=ReadStateHall2Motor1;
@@ -475,13 +519,7 @@ void control_hall_motor1(void)
 				Disable_Lo_V1;
 				Enable_Lo_W1; // W -
 				CurrentHallState=1;
-				int CurrentSpeed = 6000/(HallSwitchTime*14);
-				char buf[6] = {0,0,0,'\n','\r',0};
-				buf[0] = CurrentSpeed/100 + 48;
-				buf[1] = (CurrentSpeed%100)/10 + 48;
-				buf[2] = CurrentSpeed%10 + 48;
-				str_to_usart(buf);
-				HallSwitchTime = 0;
+				HallCounter++;
 
 			}
 		}
@@ -496,7 +534,6 @@ void control_hall_motor1(void)
 				Disable_Lo_V1;
 				Enable_Lo_W1;   // W -
 				CurrentHallState=2;
-				HallSwitchTime = 0;
 			}
 		}
 		else if(hallph1 == 0 && hallph2 == 1 && hallph3 == 0)
@@ -510,12 +547,6 @@ void control_hall_motor1(void)
 				Disable_Lo_U1;
 				Enable_Lo_V1;    // V -
 				CurrentHallState=3;
-				char buf[6] = {0,0,0,'\n','\r',0};
-				buf[0] = HallSwitchTime/100 + 48;
-				buf[1] = (HallSwitchTime%100)/10 + 48;
-				buf[2] = HallSwitchTime%10 + 48;
-				//str_to_usart(buf);
-				HallSwitchTime = 0;
 			}
 		}
 		else if(hallph1 == 1 && hallph2 == 1 && hallph3 == 0)
@@ -529,7 +560,6 @@ void control_hall_motor1(void)
 				Disable_Lo_U1;
 				Enable_Lo_V1;    // V -
 				CurrentHallState=4;
-				HallSwitchTime = 0;
 			}
 		}
 		else if(hallph1 == 1 && hallph2 == 0 && hallph3 == 0)
@@ -543,7 +573,6 @@ void control_hall_motor1(void)
 				Disable_Lo_V1;
 				Enable_Lo_U1;    // U -
 				CurrentHallState=5;
-				HallSwitchTime = 0;
 			}
 		}
 		else if(hallph1 == 1 && hallph2 == 0 && hallph3 == 1)
@@ -557,7 +586,6 @@ void control_hall_motor1(void)
 				Disable_Lo_V1;
 				Enable_Lo_U1;    // U -
 				CurrentHallState=6;
-				HallSwitchTime = 0;
 			}
 		}
 	}

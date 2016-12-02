@@ -27,7 +27,8 @@ uint8_t current_stateBLDC1 =0;                       // Флаг того что
 uint8_t previous_stateBLDC1 =0;                      // Предыдущее состояние
 uint8_t CountStates_statesBLDC1 = 0;                 // Счетчик количества переключений по состояниям (для регулятора)
 uint8_t emf_delayBLDC1=19;//3                        // Время удержания состояния (Обр Эдс)
-uint16_t HallCounter = 0;							// Счетчик тиков состояния
+float HallCounter = 0;							// Счетчик тиков состояния
+uint16_t HallCounterState = 42;
 uint16_t SpeedSendTime = 0;							// тестируем измерение скорости
 uint8_t count_step_statesBLDC2=0;
 uint8_t enable_stateBLDC2 =0;
@@ -38,7 +39,9 @@ uint8_t CountStates_statesBLDC2 = 0;
 uint8_t emf_delayBLDC2=19;
 uint8_t ControlMode = 0x00;
 uint8_t WayLength = 0;
-uint8_t CountOfRound = 0;
+uint8_t RotateAngle = 0;
+
+
 
 
 
@@ -61,6 +64,7 @@ uint8_t DriveMode=0;
 
 uint8_t SetHallControl = 1;                       // Режим управления по датчикам холла Флаг
 uint8_t CurrentHallState = 100;                    // Текущее состояние по датчикам холла
+int CurrentSpeed = 0;
 
 void SysTick_Handler(void);
 void delay_ms(uint16_t del_temp);
@@ -399,6 +403,7 @@ void USART2_IRQHandler(void)
 			// Теперь проверим что это наш пакет  0б - 0х00, 1б - скорость лево, 2б - скорость право, 3б - режим, 4б - \n, 5б - \r
 			//                                  0x0A                   0x0D
 			ControlMode = Temp_buf[0];
+
 			if((Temp_buf[4]=='\n')&&(Temp_buf[5]=='\r'))  // ищем наш опозновательный знак
 			{
 				switch(ControlMode)
@@ -436,7 +441,6 @@ void USART2_IRQHandler(void)
 
 								BufFill=tBufFill; // Присвоем текущие значения
 								BufRd=tBufRd;
-							}
 						break;
 
 					case WayMode:
@@ -455,7 +459,7 @@ void USART2_IRQHandler(void)
 
 						break;
 
-					case RoundMode:
+					case AngleMode:
 						LeftSpeed=Temp_buf[2]; // Забираем скорость
 						RightSpeed=Temp_buf[2];
 
@@ -466,7 +470,7 @@ void USART2_IRQHandler(void)
 						TIM_SetCompare2(TIM8, ((RightSpeed&0xFE)>>1)*15);
 						TIM_SetCompare3(TIM8, ((RightSpeed&0xFE)>>1)*15);
 
-						CountOfRounds = Temp_buf[1];
+						RotateAngle = Temp_buf[1];
 						break;
 
 					default:
@@ -478,10 +482,8 @@ void USART2_IRQHandler(void)
 						BufFill=BufFill-1;
 						break;
 
-				}
-		}
-
-
+				}//-------------END of switch
+			}//----------END of if
 			/*else // если опозновательный не найден сместимся на один байт
 			{
 				BufRd=BufRd+1;
@@ -491,14 +493,14 @@ void USART2_IRQHandler(void)
 				}
 				BufFill=BufFill-1;
 			}*/
-		}
+		}//---------------End of while
 		if(BufWr>=255)// Конец массива закольцуем на начало
 		{
 			BufWr=0;
 		}
+	}//-------------END of IF
 		//-----------------------------------------------------------------------
-	}
-}
+}// END of Function
 //-----------------------------------------------------------------------
 // Функция отправки строчки в юарт
 void str_to_usart(char* str)
@@ -525,19 +527,21 @@ void SysTick_Handler(void) // Таймер 1мс
 		delay_timeBLDC1--; //Отсчет задержки
 	if(delay_timeBLDC2>0)
 		delay_timeBLDC2--;
-	SpeedSendTime++;
 
-	if(SpeedSendTime == 200)
+	if (SpeedSendTime < 1000)
+		SpeedSendTime++;
+	else
 	{
-		int CurrentSpeed = 300*HallCounter/14;
+	/*	CurrentSpeed = HallCounter/14*60;
 		char buf[6] = {0,0,0,'\n','\r',0};
-		buf[0] = CurrentSpeed%1000/100 + 48;
-		buf[1] = (CurrentSpeed%100)/10 + 48;
-		buf[2] = CurrentSpeed%10 + 48;
-		str_to_usart(buf);
-		SpeedSendTime = 0;
+		buf[0] = (HallCounter%1000)/100 + 48;
+		buf[1] = (HallCounter%100)/10 + 48;
+		buf[2] = (HallCounter%10) + 48;
+		str_to_usart(buf);*/
 		HallCounter = 0;
+		SpeedSendTime = 0;
 	}
+
 	if(CountStates_ticks < 250) // Считаем 250 мс
 	{
 		CountStates_ticks++;
@@ -545,7 +549,7 @@ void SysTick_Handler(void) // Таймер 1мс
 	else
 	{
 		CountStates_ticks = 0; // Если досчитали, то отправляем количество пройденых меток
-		USART_SendData(USART2, CountStates_statesBLDC2);// Для ПИД регулятора
+		//USART_SendData(USART2, CountStates_statesBLDC2);// Для ПИД регулятора
 		//CountStates_statesBLDC1 = 0;
 		CountStates_statesBLDC2=0;
 	}
@@ -561,6 +565,10 @@ void control_hall_motor1(void)
 		hallph2=ReadStateHall2Motor1;
 		hallph3=ReadStateHall3Motor1;
 
+		if (HallCounterState != CurrentHallState) {
+			HallCounter++;
+			HallCounterState = CurrentHallState;
+		}
 		if(hallph1 == 0 && hallph2 == 0 && hallph3 == 1)
 		{
 			if(CurrentHallState!=1)
@@ -572,7 +580,15 @@ void control_hall_motor1(void)
 				Disable_Lo_V1;
 				Enable_Lo_W1; // W -
 				CurrentHallState=1;
-				HallCounter++;
+				//HallCounter ++;
+
+				/*TestCount ++;
+				char buf[6] = {0,0,0,'\n','\r',0};
+				buf[0] = (TestCount%1000)/100 + 48;
+				buf[1] = (TestCount%100)/10 + 48;
+				buf[2] = (TestCount%10) + 48;
+				str_to_usart(buf);*/
+
 
 			}
 		}

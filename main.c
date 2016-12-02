@@ -51,6 +51,8 @@ uint8_t hallph3;
 
 uint8_t LeftSpeed=0;
 uint8_t RightSpeed=0;
+uint8_t LeftDir = 0;
+uint8_t RightDir = 0;
 
 uint16_t BufFill=0;
 uint16_t BufRd=0;
@@ -412,6 +414,9 @@ void USART2_IRQHandler(void)
 
 								LeftSpeed=Temp_buf[1]; // Забираем скорость
 								RightSpeed=Temp_buf[2];
+								LeftDir = LeftSpeed&0x01;
+								RightDir = RightSpeed&0x01;
+
 
 								int tmp = ((LeftSpeed&0xFE)>>1)*15;
 								char buf[13] = {'L',0,0,0,0,'R',0,0,0,0, '\n','\r',0};
@@ -556,14 +561,14 @@ void SysTick_Handler(void) // Таймер 1мс
 }
 
 //-------------------------------------------------------------------------------
-// Управление по датчикам холла ДВИГАТЕЛЬ 1
+// Управление по датчикам холла ДВИГАТЕЛЬ 1 LEFT
 void control_hall_motor1(void)
 {
 	if(SetHallControl==1) // дополнительный флаг
 	{
-		hallph1=ReadStateHall1Motor1;
-		hallph2=ReadStateHall2Motor1;
-		hallph3=ReadStateHall3Motor1;
+		hallph1=ReadStateHall1Motor1^LeftDir;
+		hallph2=ReadStateHall2Motor1^LeftDir;
+		hallph3=ReadStateHall3Motor1^LeftDir;
 
 		/*if (HallCounterState != CurrentHallState) {
 			HallCounter++;
@@ -659,14 +664,14 @@ void control_hall_motor1(void)
 		}
 	}
 }
-// Управление по датчикам холла ДВИГАТЕЛЬ 2
+// Управление по датчикам холла ДВИГАТЕЛЬ 2 RIGHT
 void control_hall_motor2(void)
 {
 	if(SetHallControl==1)
 	{
-		hallph1=ReadStateHall1Motor2;
-		hallph2=ReadStateHall2Motor2;
-		hallph3=ReadStateHall3Motor2;
+		hallph1=ReadStateHall1Motor2^RightDir;
+		hallph2=ReadStateHall2Motor2^RightDir;
+		hallph3=ReadStateHall3Motor2^RightDir;
 
 		if(hallph1 == 0 && hallph2 == 0 && hallph3 == 1)
 		{

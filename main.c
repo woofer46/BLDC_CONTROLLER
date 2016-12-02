@@ -27,7 +27,7 @@ uint8_t current_stateBLDC1 =0;                       // Флаг того что
 uint8_t previous_stateBLDC1 =0;                      // Предыдущее состояние
 uint8_t CountStates_statesBLDC1 = 0;                 // Счетчик количества переключений по состояниям (для регулятора)
 uint8_t emf_delayBLDC1=19;//3                        // Время удержания состояния (Обр Эдс)
-float HallCounter = 0;							// Счетчик тиков состояния
+uint8_t HallCounter = 0;							// Счетчик тиков состояния
 uint16_t HallCounterState = 42;
 uint16_t SpeedSendTime = 0;							// тестируем измерение скорости
 uint8_t count_step_statesBLDC2=0;
@@ -447,9 +447,9 @@ void USART2_IRQHandler(void)
 						LeftSpeed=Temp_buf[2]; // Забираем скорость
 						RightSpeed=Temp_buf[2];
 
-						TIM_SetCompare1(TIM4, ((LeftSpeed&0xFE)>>1)*15);
-						TIM_SetCompare2(TIM4, ((LeftSpeed&0xFE)>>1)*15);
-						TIM_SetCompare3(TIM4, ((LeftSpeed&0xFE)>>1)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
+						TIM_SetCompare1(TIM1, ((LeftSpeed&0xFE)>>1)*15);
+						TIM_SetCompare2(TIM1, ((LeftSpeed&0xFE)>>1)*15);
+						TIM_SetCompare3(TIM1, ((LeftSpeed&0xFE)>>1)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
 						TIM_SetCompare1(TIM8, ((RightSpeed&0xFE)>>1)*15);
 						TIM_SetCompare2(TIM8, ((RightSpeed&0xFE)>>1)*15);
 						TIM_SetCompare3(TIM8, ((RightSpeed&0xFE)>>1)*15);
@@ -532,12 +532,12 @@ void SysTick_Handler(void) // Таймер 1мс
 		SpeedSendTime++;
 	else
 	{
-	/*	CurrentSpeed = HallCounter/14*60;
+		CurrentSpeed = HallCounter/14*60;
 		char buf[6] = {0,0,0,'\n','\r',0};
 		buf[0] = (HallCounter%1000)/100 + 48;
 		buf[1] = (HallCounter%100)/10 + 48;
 		buf[2] = (HallCounter%10) + 48;
-		str_to_usart(buf);*/
+		str_to_usart(buf);
 		HallCounter = 0;
 		SpeedSendTime = 0;
 	}
@@ -565,10 +565,10 @@ void control_hall_motor1(void)
 		hallph2=ReadStateHall2Motor1;
 		hallph3=ReadStateHall3Motor1;
 
-		if (HallCounterState != CurrentHallState) {
+		/*if (HallCounterState != CurrentHallState) {
 			HallCounter++;
 			HallCounterState = CurrentHallState;
-		}
+		}*/
 		if(hallph1 == 0 && hallph2 == 0 && hallph3 == 1)
 		{
 			if(CurrentHallState!=1)
@@ -580,7 +580,7 @@ void control_hall_motor1(void)
 				Disable_Lo_V1;
 				Enable_Lo_W1; // W -
 				CurrentHallState=1;
-				//HallCounter ++;
+				HallCounter ++;
 
 				/*TestCount ++;
 				char buf[6] = {0,0,0,'\n','\r',0};

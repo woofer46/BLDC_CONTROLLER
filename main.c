@@ -65,7 +65,8 @@ uint8_t DriveMode=0;
 
 
 uint8_t SetHallControl = 1;                       // Режим управления по датчикам холла Флаг
-uint8_t CurrentHallState = 100;                    // Текущее состояние по датчикам холла
+uint8_t CurrentHallState1 = 100;                    // Текущее состояние по датчикам холла
+uint8_t CurrentHallState2 = 100;
 int CurrentSpeed = 0;
 
 void SysTick_Handler(void);
@@ -95,15 +96,15 @@ void disable_tim_chanels(void);
 #define WayMode 0x01
 #define AngleMode 0x02
 
-//Двигатель 1
+//Двигатель 1 LEFT
 #define ReadPhase_U1 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_0)
 #define ReadPhase_V1 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_1)
 #define ReadPhase_W1 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_2)
-//Двигатель 2
+//Двигатель 2 RIGHT
 #define ReadPhase_U2 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_3)
 #define ReadPhase_V2 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4)
 #define ReadPhase_W2 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_5)
-//Двигатель 1
+//Двигатель 1 LEFT
 #define Disable_Ho_U1 TIM_CCxCmd(TIM8, TIM_Channel_1, TIM_CCx_Disable);
 #define Disable_Ho_V1 TIM_CCxCmd(TIM8, TIM_Channel_2, TIM_CCx_Disable);
 #define Disable_Ho_W1 TIM_CCxCmd(TIM8, TIM_Channel_3, TIM_CCx_Disable);
@@ -112,7 +113,7 @@ void disable_tim_chanels(void);
 #define Enable_Ho_V1 TIM_CCxCmd(TIM8, TIM_Channel_2, TIM_CCx_Enable);
 #define Enable_Ho_W1 TIM_CCxCmd(TIM8, TIM_Channel_3, TIM_CCx_Enable);
 
-//Двигатель 2
+//Двигатель 2 RIGHT
 #define Disable_Ho_U2 TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Disable);
 #define Disable_Ho_V2 TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Disable);
 #define Disable_Ho_W2 TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Disable);
@@ -121,7 +122,7 @@ void disable_tim_chanels(void);
 #define Enable_Ho_V2 TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Enable);
 #define Enable_Ho_W2 TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Enable);
 
-//Двигатель 1
+//Двигатель 1 LEFT
 #define Disable_Lo_U1 GPIO_ResetBits(GPIOA, GPIO_Pin_7);
 #define Disable_Lo_V1 GPIO_ResetBits(GPIOB, GPIO_Pin_0);
 #define Disable_Lo_W1 GPIO_ResetBits(GPIOB, GPIO_Pin_1);
@@ -130,7 +131,7 @@ void disable_tim_chanels(void);
 #define Enable_Lo_V1 GPIO_SetBits(GPIOB, GPIO_Pin_0);
 #define Enable_Lo_W1 GPIO_SetBits(GPIOB, GPIO_Pin_1);
 
-//Двигатель 2
+//Двигатель 2 RIGHT
 #define Disable_Lo_U2 GPIO_ResetBits(GPIOB, GPIO_Pin_13);
 #define Disable_Lo_V2 GPIO_ResetBits(GPIOB, GPIO_Pin_14);
 #define Disable_Lo_W2 GPIO_ResetBits(GPIOB, GPIO_Pin_15);
@@ -139,15 +140,17 @@ void disable_tim_chanels(void);
 #define Enable_Lo_V2 GPIO_SetBits(GPIOB, GPIO_Pin_14);
 #define Enable_Lo_W2 GPIO_SetBits(GPIOB, GPIO_Pin_15);
 
-// Чтение состояний датчиков холла для двигателя 1
+// Чтение состояний датчиков холла для двигателя 1 LEFT
 #define ReadStateHall1Motor1 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_2)
 #define ReadStateHall2Motor1 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_3)
 #define ReadStateHall3Motor1 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_4)
 
-// Чтение состояний датчиков холла для двигателя 2
+// Чтение состояний датчиков холла для двигателя 2 RIGHT
 #define ReadStateHall1Motor2 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_7)
 #define ReadStateHall2Motor2 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_10)
 #define ReadStateHall3Motor2 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_11)
+
+
 
 int main(void)
 {
@@ -209,7 +212,7 @@ int main(void)
     //-----------------------------------------------------------------------
     PrescalerValue = (uint16_t) ((SystemCoreClock /2) / 28000000) - 1;
     //-----------------------------------------------------------------------
-    // Настройка TIM1 Двигатель 2
+    // Настройка TIM1 Двигатель 2 RIGHT
     TIM_TimeBaseStructure.TIM_Period=2000;
     TIM_TimeBaseStructure.TIM_Prescaler = PrescalerValue;
     TIM_TimeBaseStructure.TIM_ClockDivision = 0;
@@ -237,7 +240,7 @@ int main(void)
     // Предзагрузка
     TIM_ARRPreloadConfig(TIM1, ENABLE);
     //-----------------------------------------------------------------------
-    // Настройка TIM8 Двигатель 1
+    // Настройка TIM8 Двигатель 1 LEFT
     TIM_TimeBaseStructure.TIM_Period=2000;
     TIM_TimeBaseStructure.TIM_Prescaler = PrescalerValue;
     TIM_TimeBaseStructure.TIM_ClockDivision = 0;
@@ -332,6 +335,14 @@ int main(void)
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
 	//-----------------------------------------------------------------------
+	// Вход с датчиков Холла, двигатель 2
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7 | GPIO_Pin_10 | GPIO_Pin_11;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOD, &GPIO_InitStructure);
+	//-----------------------------------------------------------
 	// Настройка USART
 	GPIO_InitTypeDef  GPIO_InitUSART;
 	USART_InitTypeDef USART_InitUser;
@@ -370,6 +381,7 @@ int main(void)
 		if(DriveMode==0x01) // Hall enable
 		{
 			control_hall_motor1();
+			control_hall_motor2();
 		}
     }
 }
@@ -414,8 +426,11 @@ void USART2_IRQHandler(void)
 
 								LeftSpeed=Temp_buf[1]; // Забираем скорость
 								RightSpeed=Temp_buf[2];
-								LeftDir = LeftSpeed&0x01;
-								RightDir = RightSpeed&0x01;
+
+								LeftDir = !((LeftSpeed&0x80)>>7);
+								RightDir = ((RightSpeed&0x80)>>7);
+
+
 
 
 								int tmp = ((LeftSpeed&0xFE)>>1)*15;
@@ -435,12 +450,12 @@ void USART2_IRQHandler(void)
 
 								//str_to_usart(buf);
 
-								TIM_SetCompare1(TIM4, ((LeftSpeed&0xFE)>>1)*15);
-								TIM_SetCompare2(TIM4, ((LeftSpeed&0xFE)>>1)*15);
-								TIM_SetCompare3(TIM4, ((LeftSpeed&0xFE)>>1)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
-								TIM_SetCompare1(TIM8, ((RightSpeed&0xFE)>>1)*15);
-								TIM_SetCompare2(TIM8, ((RightSpeed&0xFE)>>1)*15);
-								TIM_SetCompare3(TIM8, ((RightSpeed&0xFE)>>1)*15);
+								TIM_SetCompare1(TIM1, (RightSpeed&0x7F)*15);
+								TIM_SetCompare2(TIM1, (RightSpeed&0x7F)*15);
+								TIM_SetCompare3(TIM1, (RightSpeed&0x7F)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
+								TIM_SetCompare1(TIM8, (LeftSpeed&0x7F)*15);
+								TIM_SetCompare2(TIM8, (LeftSpeed&0x7F)*15);
+								TIM_SetCompare3(TIM8, (LeftSpeed&0x7F)*15);
 
 								DriveMode=Temp_buf[3];//0x01 - Hall, 0x02 - EMF, 0x00 - Disable
 
@@ -452,12 +467,15 @@ void USART2_IRQHandler(void)
 						LeftSpeed=Temp_buf[2]; // Забираем скорость
 						RightSpeed=Temp_buf[2];
 
-						TIM_SetCompare1(TIM1, ((LeftSpeed&0xFE)>>1)*15);
-						TIM_SetCompare2(TIM1, ((LeftSpeed&0xFE)>>1)*15);
-						TIM_SetCompare3(TIM1, ((LeftSpeed&0xFE)>>1)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
-						TIM_SetCompare1(TIM8, ((RightSpeed&0xFE)>>1)*15);
-						TIM_SetCompare2(TIM8, ((RightSpeed&0xFE)>>1)*15);
-						TIM_SetCompare3(TIM8, ((RightSpeed&0xFE)>>1)*15);
+						LeftDir = !((LeftSpeed&0x80)>>7);
+						RightDir = ((RightSpeed&0x80)>>7);
+
+						TIM_SetCompare1(TIM1, (RightSpeed&0x7F)*15);
+						TIM_SetCompare2(TIM1, (RightSpeed&0x7F)*15);
+						TIM_SetCompare3(TIM1, (RightSpeed&0x7F)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
+						TIM_SetCompare1(TIM8, (LeftSpeed&0x7F)*15);
+						TIM_SetCompare2(TIM8, (LeftSpeed&0x7F)*15);
+						TIM_SetCompare3(TIM8, (LeftSpeed&0x7F)*15);
 
 						WayLength = Temp_buf[1]; //дописать формулу для длины исходя из количетсва оборотов колеса
 
@@ -468,12 +486,15 @@ void USART2_IRQHandler(void)
 						LeftSpeed=Temp_buf[2]; // Забираем скорость
 						RightSpeed=Temp_buf[2];
 
-						TIM_SetCompare1(TIM4, ((LeftSpeed&0xFE)>>1)*15);
-						TIM_SetCompare2(TIM4, ((LeftSpeed&0xFE)>>1)*15);
-						TIM_SetCompare3(TIM4, ((LeftSpeed&0xFE)>>1)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
-						TIM_SetCompare1(TIM8, ((RightSpeed&0xFE)>>1)*15);
-						TIM_SetCompare2(TIM8, ((RightSpeed&0xFE)>>1)*15);
-						TIM_SetCompare3(TIM8, ((RightSpeed&0xFE)>>1)*15);
+						LeftDir = !((LeftSpeed&0x80)>>7);
+						RightDir = ((RightSpeed&0x80)>>7);
+
+						TIM_SetCompare1(TIM1, (RightSpeed&0x7F)*15);
+						TIM_SetCompare2(TIM1, (RightSpeed&0x7F)*15);
+						TIM_SetCompare3(TIM1, (RightSpeed&0x7F)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
+						TIM_SetCompare1(TIM8, (LeftSpeed&0x7F)*15);
+						TIM_SetCompare2(TIM8, (LeftSpeed&0x7F)*15);
+						TIM_SetCompare3(TIM8, (LeftSpeed&0x7F)*15);
 
 						RotateAngle = Temp_buf[1];
 						break;
@@ -537,12 +558,13 @@ void SysTick_Handler(void) // Таймер 1мс
 		SpeedSendTime++;
 	else
 	{
-		CurrentSpeed = HallCounter/14*60;
+	/*	CurrentSpeed = HallCounter/14*60;
 		char buf[6] = {0,0,0,'\n','\r',0};
 		buf[0] = (HallCounter%1000)/100 + 48;
 		buf[1] = (HallCounter%100)/10 + 48;
 		buf[2] = (HallCounter%10) + 48;
-		str_to_usart(buf);
+	//	str_to_usart(buf);*/
+		USART_SendData(USART2, HallCounter);
 		HallCounter = 0;
 		SpeedSendTime = 0;
 	}
@@ -576,7 +598,7 @@ void control_hall_motor1(void)
 		}*/
 		if(hallph1 == 0 && hallph2 == 0 && hallph3 == 1)
 		{
-			if(CurrentHallState!=1)
+			if(CurrentHallState1!=1)
 			{
 				Disable_Ho_U1;
 				Disable_Ho_W1;
@@ -584,7 +606,7 @@ void control_hall_motor1(void)
 				Disable_Lo_U1;
 				Disable_Lo_V1;
 				Enable_Lo_W1; // W -
-				CurrentHallState=1;
+				CurrentHallState1=1;
 				HallCounter ++;
 
 				/*TestCount ++;
@@ -599,7 +621,7 @@ void control_hall_motor1(void)
 		}
 		else if(hallph1 == 0 && hallph2 == 1 && hallph3 == 1)
 		{
-			if(CurrentHallState!=2)
+			if(CurrentHallState1!=2)
 			{
 				Disable_Ho_V1;
 				Disable_Ho_W1;
@@ -607,12 +629,12 @@ void control_hall_motor1(void)
 				Disable_Lo_U1;
 				Disable_Lo_V1;
 				Enable_Lo_W1;   // W -
-				CurrentHallState=2;
+				CurrentHallState1=2;
 			}
 		}
 		else if(hallph1 == 0 && hallph2 == 1 && hallph3 == 0)
 		{
-			if(CurrentHallState!=3)
+			if(CurrentHallState1!=3)
 			{
 				Disable_Ho_V1;
 				Disable_Ho_W1;
@@ -620,12 +642,12 @@ void control_hall_motor1(void)
 				Disable_Lo_W1;
 				Disable_Lo_U1;
 				Enable_Lo_V1;    // V -
-				CurrentHallState=3;
+				CurrentHallState1=3;
 			}
 		}
 		else if(hallph1 == 1 && hallph2 == 1 && hallph3 == 0)
 		{
-			if(CurrentHallState!=4)
+			if(CurrentHallState1!=4)
 			{
 				Disable_Ho_U1;
 				Disable_Ho_V1;
@@ -633,12 +655,12 @@ void control_hall_motor1(void)
 				Disable_Lo_W1;
 				Disable_Lo_U1;
 				Enable_Lo_V1;    // V -
-				CurrentHallState=4;
+				CurrentHallState1=4;
 			}
 		}
 		else if(hallph1 == 1 && hallph2 == 0 && hallph3 == 0)
 		{
-			if(CurrentHallState!=5)
+			if(CurrentHallState1!=5)
 			{
 				Disable_Ho_U1;
 				Disable_Ho_V1;
@@ -646,12 +668,12 @@ void control_hall_motor1(void)
 				Disable_Lo_W1;
 				Disable_Lo_V1;
 				Enable_Lo_U1;    // U -
-				CurrentHallState=5;
+				CurrentHallState1=5;
 			}
 		}
 		else if(hallph1 == 1 && hallph2 == 0 && hallph3 == 1)
 		{
-			if(CurrentHallState!=6)
+			if(CurrentHallState1!=6)
 			{
 				Disable_Ho_U1;
 				Disable_Ho_W1;
@@ -659,9 +681,10 @@ void control_hall_motor1(void)
 				Disable_Lo_W1;
 				Disable_Lo_V1;
 				Enable_Lo_U1;    // U -
-				CurrentHallState=6;
+				CurrentHallState1=6;
 			}
 		}
+		//delay_ms(4);
 	}
 }
 // Управление по датчикам холла ДВИГАТЕЛЬ 2 RIGHT
@@ -675,80 +698,80 @@ void control_hall_motor2(void)
 
 		if(hallph1 == 0 && hallph2 == 0 && hallph3 == 1)
 		{
-			if(CurrentHallState!=1)
+			if(CurrentHallState2!=1)
 			{
-				Disable_Ho_U1;
-				Disable_Ho_W1;
-				Enable_Ho_V1; // V +
-				Disable_Lo_U1;
-				Disable_Lo_V1;
-				Enable_Lo_W1; // W -
-				CurrentHallState=1;
+				Disable_Ho_U2;
+				Disable_Ho_W2;
+				Enable_Ho_V2; // V +
+				Disable_Lo_U2;
+				Disable_Lo_V2;
+				Enable_Lo_W2; // W -
+				CurrentHallState2=1;
 			}
 		}
 		else if(hallph1 == 0 && hallph2 == 1 && hallph3 == 1)
 		{
-			if(CurrentHallState!=2)
+			if(CurrentHallState2!=2)
 			{
-				Disable_Ho_V1;
-				Disable_Ho_W1;
-				Enable_Ho_U1;   // U +
-				Disable_Lo_U1;
-				Disable_Lo_V1;
-				Enable_Lo_W1;   // W -
-				CurrentHallState=2;
+				Disable_Ho_V2;
+				Disable_Ho_W2;
+				Enable_Ho_U2;   // U +
+				Disable_Lo_U2;
+				Disable_Lo_V2;
+				Enable_Lo_W2;   // W -
+				CurrentHallState2=2;
 			}
 		}
 		else if(hallph1 == 0 && hallph2 == 1 && hallph3 == 0)
 		{
-			if(CurrentHallState!=3)
+			if(CurrentHallState2!=3)
 			{
-				Disable_Ho_V1;
-				Disable_Ho_W1;
-				Enable_Ho_U1;    // U +
-				Disable_Lo_W1;
-				Disable_Lo_U1;
-				Enable_Lo_V1;    // V -
-				CurrentHallState=3;
+				Disable_Ho_V2;
+				Disable_Ho_W2;
+				Enable_Ho_U2;    // U +
+				Disable_Lo_W2;
+				Disable_Lo_U2;
+				Enable_Lo_V2;    // V -
+				CurrentHallState2=3;
 			}
 		}
 		else if(hallph1 == 1 && hallph2 == 1 && hallph3 == 0)
 		{
-			if(CurrentHallState!=4)
+			if(CurrentHallState2!=4)
 			{
-				Disable_Ho_U1;
-				Disable_Ho_V1;
-				Enable_Ho_W1;    // W +
-				Disable_Lo_W1;
-				Disable_Lo_U1;
-				Enable_Lo_V1;    // V -
-				CurrentHallState=4;
+				Disable_Ho_U2;
+				Disable_Ho_V2;
+				Enable_Ho_W2;    // W +
+				Disable_Lo_W2;
+				Disable_Lo_U2;
+				Enable_Lo_V2;    // V -
+				CurrentHallState2=4;
 			}
 		}
 		else if(hallph1 == 1 && hallph2 == 0 && hallph3 == 0)
 		{
-			if(CurrentHallState!=5)
+			if(CurrentHallState2!=5)
 			{
-				Disable_Ho_U1;
-				Disable_Ho_V1;
-				Enable_Ho_W1;    // W +
-				Disable_Lo_W1;
-				Disable_Lo_V1;
-				Enable_Lo_U1;    // U -
-				CurrentHallState=5;
+				Disable_Ho_U2;
+				Disable_Ho_V2;
+				Enable_Ho_W2;    // W +
+				Disable_Lo_W2;
+				Disable_Lo_V2;
+				Enable_Lo_U2;    // U -
+				CurrentHallState2=5;
 			}
 		}
 		else if(hallph1 == 1 && hallph2 == 0 && hallph3 == 1)
 		{
-			if(CurrentHallState!=6)
+			if(CurrentHallState2!=6)
 			{
-				Disable_Ho_U1;
-				Disable_Ho_W1;
-				Enable_Ho_V1;    // V +
-				Disable_Lo_W1;
-				Disable_Lo_V1;
-				Enable_Lo_U1;    // U -
-				CurrentHallState=6;
+				Disable_Ho_U2;
+				Disable_Ho_W2;
+				Enable_Ho_V2;    // V +
+				Disable_Lo_W2;
+				Disable_Lo_V2;
+				Enable_Lo_U2;    // U -
+				CurrentHallState2=6;
 			}
 		}
 	}

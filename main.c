@@ -40,7 +40,8 @@ uint8_t emf_delayBLDC2=19;
 uint8_t ControlMode = 0x00;
 uint8_t WayLength = 0;
 uint8_t RotateAngle = 0;
-
+uint8_t PrevHallState = 0;
+uint8_t Test14 = 0;
 
 
 
@@ -371,8 +372,10 @@ int main(void)
 	USART_Cmd(USART2, ENABLE);
 	//-------------------------------------------------------------------------------
 	str_to_usart("Program is ready\n\r");
+	control_hall_motor1();
     while(1)
-    {
+
+    {	control_hall_motor1();
 		if(DriveMode==0x02)
 		{
 			control_emf();
@@ -380,7 +383,7 @@ int main(void)
 		}
 		if(DriveMode==0x01) // Hall enable
 		{
-			control_hall_motor1();
+			//control_hall_motor1();
 			control_hall_motor2();
 		}
     }
@@ -554,16 +557,16 @@ void SysTick_Handler(void) // Таймер 1мс
 	if(delay_timeBLDC2>0)
 		delay_timeBLDC2--;
 
-	if (SpeedSendTime < 1000)
+	if (SpeedSendTime < 5000)
 		SpeedSendTime++;
 	else
 	{
-	/*	CurrentSpeed = HallCounter/14*60;
-		char buf[6] = {0,0,0,'\n','\r',0};
+		CurrentSpeed = HallCounter/14*60;
+		char buf[6] = {0,0,0,' '};
 		buf[0] = (HallCounter%1000)/100 + 48;
 		buf[1] = (HallCounter%100)/10 + 48;
 		buf[2] = (HallCounter%10) + 48;
-	//	str_to_usart(buf);*/
+		//str_to_usart(buf);
 		USART_SendData(USART2, HallCounter);
 		HallCounter = 0;
 		SpeedSendTime = 0;
@@ -592,6 +595,14 @@ void control_hall_motor1(void)
 		hallph2=ReadStateHall2Motor1^LeftDir;
 		hallph3=ReadStateHall3Motor1^LeftDir;
 
+		if(CurrentHallState1!=PrevHallState) {
+			PrevHallState = CurrentHallState1;
+			HallCounter++;
+			if (Test14%(14*6) == 0) {
+				Test14 = 0;
+			}
+			Test14++;
+		}
 		/*if (HallCounterState != CurrentHallState) {
 			HallCounter++;
 			HallCounterState = CurrentHallState;
@@ -600,14 +611,15 @@ void control_hall_motor1(void)
 		{
 			if(CurrentHallState1!=1)
 			{
+				CurrentHallState1=1;
+				/*HallCounter ++;
+				*/
 				Disable_Ho_U1;
 				Disable_Ho_W1;
 				Enable_Ho_V1; // V +
 				Disable_Lo_U1;
 				Disable_Lo_V1;
 				Enable_Lo_W1; // W -
-				CurrentHallState1=1;
-				HallCounter ++;
 
 				/*TestCount ++;
 				char buf[6] = {0,0,0,'\n','\r',0};

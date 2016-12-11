@@ -13,10 +13,6 @@ uint16_t delay_timeBLDC1=0;                          // Счетчик заде�
 uint16_t delay_timeBLDC2=0;                          // --//--//-- (Двиг 2)
 uint8_t CountStates_ticks = 0;                       // Счетчик времение счета прошедших состояний (для регулятора)
 
-uint8_t Receive_buf[256];
-uint8_t Temp_buf[6];
-uint8_t Receive=0;
-uint8_t tmp=0;
 uint8_t flag_start=0;                                // Флаг запуска программы управления по датчикам Холла
 uint8_t control_emf_enable=0;                        // Флаг запуска управления по Обратной ЭДС
 
@@ -27,8 +23,6 @@ uint8_t current_stateBLDC1 =0;                       // Флаг того что
 uint8_t previous_stateBLDC1 =0;                      // Предыдущее состояние
 uint8_t CountStates_statesBLDC1 = 0;                 // Счетчик количества переключений по состояниям (для регулятора)
 uint8_t emf_delayBLDC1=19;//3                        // Время удержания состояния (Обр Эдс)
-uint8_t HallCounter = 0;							// Счетчик тиков состояния
-uint16_t HallCounterState = 42;
 uint16_t SpeedSendTime = 0;							// тестируем измерение скорости
 uint8_t count_step_statesBLDC2=0;
 uint8_t enable_stateBLDC2 =0;
@@ -41,11 +35,21 @@ uint8_t ControlMode = 0x00;
 uint8_t WayLength = 0;
 uint8_t RotateAngle = 0;
 uint8_t PrevHallState = 0;
-uint8_t Test14 = 0;
+uint8_t SetHallControl = 1;                       	// Режим управления по датчикам холла Флаг
 
+/*-----------------------------------------------------------------------------------------------
+								ПЕРЕМЕННЫЕ РЕГУЛЯТОРА
+-----------------------------------------------------------------------------------------------*/
+uint8_t RegTime = 1;								//Время для таймера
+float RegPKoef = 1;									//K[p]
+float RegIKoef = 1;									//K[i]
+float RegDKoef = 1;									//K[d]
+int16_t RegIBuf = 0;								//Буфер для интегрирования
+int16_t RegDBuf = 0;								//Буфер для дифференцирования
 
-
-
+/*-----------------------------------------------------------------------------------------------
+					ПЕРЕМЕННЫЕ УПРАВЛЕНИЯ ДВИГАТЕЛЕМ ПО ДАТЧИКАМ ХОЛЛА
+-----------------------------------------------------------------------------------------------*/
 uint8_t hallph1;
 uint8_t hallph2;
 uint8_t hallph3;
@@ -55,6 +59,16 @@ uint8_t RightSpeed=0;
 uint8_t LeftDir = 0;
 uint8_t RightDir = 0;
 
+uint8_t DriveMode=0;
+
+/*-----------------------------------------------------------------------------------------------
+							ПЕРЕМЕННЫЕ ПРИЕМА ДАННЫХ ПО UART
+-----------------------------------------------------------------------------------------------*/
+uint8_t Receive_buf[256];
+uint8_t Temp_buf[6];
+uint8_t Receive=0;
+uint8_t tmp=0;
+
 uint16_t BufFill=0;
 uint16_t BufRd=0;
 
@@ -62,13 +76,15 @@ uint16_t tBufFill=0;
 uint16_t tBufRd=0;
 uint16_t BufWr=0;
 
-uint8_t DriveMode=0;
-
-
-uint8_t SetHallControl = 1;                       // Режим управления по датчикам холла Флаг
-uint8_t CurrentHallState1 = 100;                    // Текущее состояние по датчикам холла
-uint8_t CurrentHallState2 = 100;
+/*-----------------------------------------------------------------------------------------------
+								ПЕРЕМЕННЫЕ ИЗМЕРИТЕЛЯ СКОРОСТИ
+-----------------------------------------------------------------------------------------------*/
+uint8_t CurrentHallState1 = 100;                    // Текущее состояние двигателя 1 по датчикам холла
+uint8_t CurrentHallState2 = 100;					// Текущее состояние двигателя 2 по датчикам холла
+uint8_t HallCounter1 = 0;							// Счетчик тиков состояния двигателя 1
+uint8_t HallCounter2 = 0;							// Счетчик тиков состояния двигателя 2
 int CurrentSpeed = 0;
+/*---------------------------------------------------------------------------------------------*/
 
 void SysTick_Handler(void);
 void delay_ms(uint16_t del_temp);
@@ -96,6 +112,9 @@ void disable_tim_chanels(void);
 #define SpeedMode 0x00
 #define WayMode 0x01
 #define AngleMode 0x02
+
+//Дискретность Регулятора, [мс]
+#define RegDisc 1										
 
 //Двигатель 1 LEFT
 #define ReadPhase_U1 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_0)
@@ -557,17 +576,33 @@ void SysTick_Handler(void) // Таймер 1мс
 	if(delay_timeBLDC2>0)
 		delay_timeBLDC2--;
 
-	if (SpeedSendTime < 5000)
+	if(RegTime < RegDisc) RegTime++;
+	else {
+		/*
+		LeftDir = !((RegOut(LeftSpeed)&0x80)>>7);
+		RightDir = ((RegOut(RightSpeed)&0x80)>>7);
+
+		TIM_SetCompare1(TIM1, (RegOut(RightSpeed)&0x7F)*15);
+		TIM_SetCompare2(TIM1, (RegOut(RightSpeed)&0x7F)*15);
+		TIM_SetCompare3(TIM1, (RegOut(RightSpeed)&0x7F)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
+		TIM_SetCompare1(TIM8, (RegOut(LeftSpeed)&0x7F)*15);
+		TIM_SetCompare2(TIM8, (RegOut(LeftSpeed)&0x7F)*15);
+		TIM_SetCompare3(TIM8, (RegOut(LeftSpeed)&0x7F)*15);
+		*/
+		RegTime = 0;
+	}
+	
+	if (SpeedSendTime < 5000)							//счетчик на 5 сек для отправки скорости
 		SpeedSendTime++;
 	else
 	{
-		CurrentSpeed = HallCounter/14*60;
+		/*CurrentSpeed = HallCounter/14*60;
 		char buf[6] = {0,0,0,' '};
 		buf[0] = (HallCounter%1000)/100 + 48;
 		buf[1] = (HallCounter%100)/10 + 48;
 		buf[2] = (HallCounter%10) + 48;
-		//str_to_usart(buf);
-		USART_SendData(USART2, HallCounter);
+		str_to_usart(buf);*/
+		USART_SendData(USART2, HallCounter1);
 		HallCounter = 0;
 		SpeedSendTime = 0;
 	}
@@ -585,6 +620,21 @@ void SysTick_Handler(void) // Таймер 1мс
 	}
 }
 
+int16_t RegOut(uint16_t RegIn) {														//Функция ПИД-регулятора
+	int16_t diff = RegIn-CurrentSpeed;													//Сигнал после входного сумматора
+	int16_t output = (diff)*(RegPKoef+RegIKoef*RegIBuf+RegDKoef*(diff-RegDBuf));		//выходной сигнал регулятора
+	
+	RegDBuf = diff;																		//Сохранение предыдущего значения для Д-составляющей
+	if((RegIBuf+diff < 32767) && (RegIBuf+diff > -32767)) RegIBuf += diff;				//Накопление значения для И-составляющей с защитой от переполнения
+	
+	if(output<0) {																		//Переводим отприцательную скорость в требуемый формат
+		output *= -1;
+		output = output&0x80;
+	}
+	
+	return output;
+}
+
 //-------------------------------------------------------------------------------
 // Управление по датчикам холла ДВИГАТЕЛЬ 1 LEFT
 void control_hall_motor1(void)
@@ -595,40 +645,17 @@ void control_hall_motor1(void)
 		hallph2=ReadStateHall2Motor1^LeftDir;
 		hallph3=ReadStateHall3Motor1^LeftDir;
 
-		if(CurrentHallState1!=PrevHallState) {
-			PrevHallState = CurrentHallState1;
-			HallCounter++;
-			if (Test14%(14*6) == 0) {
-				Test14 = 0;
-			}
-			Test14++;
-		}
-		/*if (HallCounterState != CurrentHallState) {
-			HallCounter++;
-			HallCounterState = CurrentHallState;
-		}*/
 		if(hallph1 == 0 && hallph2 == 0 && hallph3 == 1)
 		{
 			if(CurrentHallState1!=1)
 			{
 				CurrentHallState1=1;
-				/*HallCounter ++;
-				*/
 				Disable_Ho_U1;
 				Disable_Ho_W1;
 				Enable_Ho_V1; // V +
 				Disable_Lo_U1;
 				Disable_Lo_V1;
 				Enable_Lo_W1; // W -
-
-				/*TestCount ++;
-				char buf[6] = {0,0,0,'\n','\r',0};
-				buf[0] = (TestCount%1000)/100 + 48;
-				buf[1] = (TestCount%100)/10 + 48;
-				buf[2] = (TestCount%10) + 48;
-				str_to_usart(buf);*/
-
-
 			}
 		}
 		else if(hallph1 == 0 && hallph2 == 1 && hallph3 == 1)
@@ -697,6 +724,14 @@ void control_hall_motor1(void)
 			}
 		}
 		//delay_ms(4);
+		if(CurrentHallState1-(PrevHallState1%6)>0) {
+			PrevHallState = CurrentHallState1;
+			HallCounter++;
+		}
+		else if((CurrentHallState1%6)-PrevHallState1<0) {
+			PrevHallState = CurrentHallState1;
+			HallCounter--;
+		}
 	}
 }
 // Управление по датчикам холла ДВИГАТЕЛЬ 2 RIGHT
@@ -785,6 +820,14 @@ void control_hall_motor2(void)
 				Enable_Lo_U2;    // U -
 				CurrentHallState2=6;
 			}
+		}
+		if(CurrentHallState2-(PrevHallState2%6)>0) {
+			PrevHallState = CurrentHallState1;
+			HallCounter++;
+		}
+		else if((CurrentHallState2%6)-PrevHallState2<0) {
+			PrevHallState = CurrentHallState1;
+			HallCounter--;
 		}
 	}
 }

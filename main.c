@@ -209,20 +209,16 @@ int main(void)
     // PWM mode
     TIM_OCInitStructure.TIM_OCMode=TIM_OCMode_PWM1;
     TIM_OCInitStructure.TIM_OutputState=TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_Pulse=380;
+    TIM_OCInitStructure.TIM_Pulse=100;
     TIM_OCInitStructure.TIM_OCPolarity=TIM_OCPolarity_High;
     //TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Set;
     // CH1
     TIM_OC1Init(TIM1, &TIM_OCInitStructure);
     TIM_OC1PreloadConfig(TIM1, TIM_OCPreload_Enable);
     // CH2
-    TIM_OCInitStructure.TIM_OutputState=TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_Pulse=380;
     TIM_OC2Init(TIM1, &TIM_OCInitStructure);
     TIM_OC2PreloadConfig(TIM1, TIM_OCPreload_Enable);
     // CH3
-    TIM_OCInitStructure.TIM_OutputState=TIM_OutputState_Enable;//
-    TIM_OCInitStructure.TIM_Pulse=380;//
     TIM_OC3Init(TIM1, &TIM_OCInitStructure);
     TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
     // Предзагрузка
@@ -237,20 +233,16 @@ int main(void)
     // PWM mode
     TIM_OCInitStructure.TIM_OCMode=TIM_OCMode_PWM1;
     TIM_OCInitStructure.TIM_OutputState=TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_Pulse=380;
+    TIM_OCInitStructure.TIM_Pulse=100;
     TIM_OCInitStructure.TIM_OCPolarity=TIM_OCPolarity_High;
     //TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Set;
     // CH1
     TIM_OC1Init(TIM8, &TIM_OCInitStructure);
     TIM_OC1PreloadConfig(TIM8, TIM_OCPreload_Enable);
     // CH2
-    TIM_OCInitStructure.TIM_OutputState=TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_Pulse=380;
     TIM_OC2Init(TIM8, &TIM_OCInitStructure);
     TIM_OC2PreloadConfig(TIM8, TIM_OCPreload_Enable);
     // CH3
-    TIM_OCInitStructure.TIM_OutputState=TIM_OutputState_Enable;//
-    TIM_OCInitStructure.TIM_Pulse=380;//
     TIM_OC3Init(TIM8, &TIM_OCInitStructure);
     TIM_OC3PreloadConfig(TIM8, TIM_OCPreload_Enable);
     // Предзагрузка
@@ -377,7 +369,7 @@ int main(void)
 }
 //Обработчик прерывания юарт
 uint8_t command_buffer[6];
-uint8_t read_index;
+uint8_t read_index = 0;
 void USART2_IRQHandler(void)
 {
 	//-----------------------------------------------------------------------
@@ -414,7 +406,7 @@ void USART2_IRQHandler(void)
 				if(RightDir == 1)
 					RightSpeed = ~command_buffer[1] + 0x01;
 				else
-					LeftSpeed = command_buffer[1];
+					RightSpeed = command_buffer[1];
 
 				TIM_SetCompare1(TIM1, (RightSpeed&0x7F)*15);
 				TIM_SetCompare2(TIM1, (RightSpeed&0x7F)*15);
@@ -423,9 +415,6 @@ void USART2_IRQHandler(void)
 				TIM_SetCompare1(TIM8, (LeftSpeed&0x7F)*15);
 				TIM_SetCompare2(TIM8, (LeftSpeed&0x7F)*15);
 				TIM_SetCompare3(TIM8, (LeftSpeed&0x7F)*15);
-
-				str_to_usart("ok");
-				int_to_usart((LeftSpeed&0x7F)*15);
 			}
 			else
 			{
@@ -434,6 +423,8 @@ void USART2_IRQHandler(void)
 			}
 			if(read_index > 255) // Если мы прочитали 255й байт из массива, то следующий должен быть 0й индекс массива
 				read_index=0;
+			if(BufWr > 255)
+				BufWr=0;
 
 		}// - end of While
 	}// - end of If

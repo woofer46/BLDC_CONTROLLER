@@ -5,6 +5,7 @@
 
 #include <stm32f4xx_conf.h>
 
+
 TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;      // Определение структуры инициализауии таймеров
 TIM_OCInitTypeDef  TIM_OCInitStructure;              // Определение структуры для настройки PWM
 uint16_t PrescalerValue = 0;                         // Определение предделителей для таймеров, ШИМ
@@ -13,6 +14,10 @@ uint16_t delay_timeBLDC1=0;                          // Счетчик заде�
 uint16_t delay_timeBLDC2=0;                          // --//--//-- (Двиг 2)
 uint8_t CountStates_ticks = 0;                       // Счетчик времение счета прошедших состояний (для регулятора)
 
+uint8_t Receive_buf[256];
+uint8_t Temp_buf[6];
+uint8_t Receive=0;
+uint8_t tmp=0;
 uint8_t flag_start=0;                                // Флаг запуска программы управления по датчикам Холла
 uint8_t control_emf_enable=0;                        // Флаг запуска управления по Обратной ЭДС
 
@@ -23,6 +28,9 @@ uint8_t current_stateBLDC1 =0;                       // Флаг того что
 uint8_t previous_stateBLDC1 =0;                      // Предыдущее состояние
 uint8_t CountStates_statesBLDC1 = 0;                 // Счетчик количества переключений по состояниям (для регулятора)
 uint8_t emf_delayBLDC1=19;//3                        // Время удержания состояния (Обр Эдс)
+uint8_t LeftHallCounter = 0;							// Счетчик тиков состояния
+uint8_t RightHallCounter = 0;
+uint16_t HallCounterState = 42;
 uint16_t SpeedSendTime = 0;							// тестируем измерение скорости
 uint8_t count_step_statesBLDC2=0;
 uint8_t enable_stateBLDC2 =0;
@@ -34,22 +42,13 @@ uint8_t emf_delayBLDC2=19;
 uint8_t ControlMode = 0x00;
 uint8_t WayLength = 0;
 uint8_t RotateAngle = 0;
-uint8_t PrevHallState = 0;
-uint8_t SetHallControl = 1;                       	// Режим управления по датчикам холла Флаг
+uint8_t LeftPrevHallState = 0;
+uint8_t RightPrevHallState = 0;
+uint8_t Test14 = 0;
 
-/*-----------------------------------------------------------------------------------------------
-								ПЕРЕМЕННЫЕ РЕГУЛЯТОРА
------------------------------------------------------------------------------------------------*/
-uint8_t RegTime = 1;								//Время для таймера
-float RegPKoef = 1;									//K[p]
-float RegIKoef = 1;									//K[i]
-float RegDKoef = 1;									//K[d]
-int16_t RegIBuf = 0;								//Буфер для интегрирования
-int16_t RegDBuf = 0;								//Буфер для дифференцирования
 
-/*-----------------------------------------------------------------------------------------------
-					ПЕРЕМЕННЫЕ УПРАВЛЕНИЯ ДВИГАТЕЛЕМ ПО ДАТЧИКАМ ХОЛЛА
------------------------------------------------------------------------------------------------*/
+
+
 uint8_t hallph1;
 uint8_t hallph2;
 uint8_t hallph3;
@@ -59,16 +58,6 @@ uint8_t RightSpeed=0;
 uint8_t LeftDir = 0;
 uint8_t RightDir = 0;
 
-uint8_t DriveMode=0;
-
-/*-----------------------------------------------------------------------------------------------
-							ПЕРЕМЕННЫЕ ПРИЕМА ДАННЫХ ПО UART
------------------------------------------------------------------------------------------------*/
-uint8_t Receive_buf[256];
-uint8_t Temp_buf[6];
-uint8_t Receive=0;
-uint8_t tmp=0;
-
 uint16_t BufFill=0;
 uint16_t BufRd=0;
 
@@ -76,15 +65,13 @@ uint16_t tBufFill=0;
 uint16_t tBufRd=0;
 uint16_t BufWr=0;
 
-/*-----------------------------------------------------------------------------------------------
-								ПЕРЕМЕННЫЕ ИЗМЕРИТЕЛЯ СКОРОСТИ
------------------------------------------------------------------------------------------------*/
-uint8_t CurrentHallState1 = 100;                    // Текущее состояние двигателя 1 по датчикам холла
-uint8_t CurrentHallState2 = 100;					// Текущее состояние двигателя 2 по датчикам холла
-uint8_t HallCounter1 = 0;							// Счетчик тиков состояния двигателя 1
-uint8_t HallCounter2 = 0;							// Счетчик тиков состояния двигателя 2
+uint8_t DriveMode=0x01;
+
+
+uint8_t SetHallControl = 1;                       // Режим управления по датчикам холла Флаг
+uint8_t CurrentHallState1 = 100;                    // Текущее состояние по датчикам холла
+uint8_t CurrentHallState2 = 100;
 int CurrentSpeed = 0;
-/*---------------------------------------------------------------------------------------------*/
 
 void SysTick_Handler(void);
 void delay_ms(uint16_t del_temp);
@@ -93,28 +80,9 @@ void str_to_usart(char* str);
 void control_emf(void);
 void disable_tim_chanels(void);
 
-/*#define Speed200_1 TIM_SetCompare1(TIM8, 400)
-#define Speed200_2 TIM_SetCompare2(TIM8, 400)
-#define Speed200_3 TIM_SetCompare3(TIM8, 400)
-
-#define Speed400_1 TIM_SetCompare1(TIM8, 800)
-#define Speed400_2 TIM_SetCompare2(TIM8, 800)
-#define Speed400_3 TIM_SetCompare3(TIM8, 800)
-
-#define Speed900_1 TIM_SetCompare1(TIM8, 2000)
-#define Speed900_2 TIM_SetCompare2(TIM8, 2000)
-#define Speed900_3 TIM_SetCompare3(TIM8, 2000)
-
-#define Speed1000_1 TIM_SetCompare1(TIM4, 2000)
-#define Speed1000_2 TIM_SetCompare2(TIM4, 2000)
-#define Speed1000_3 TIM_SetCompare3(TIM4, 2000)*/
-
 #define SpeedMode 0x00
 #define WayMode 0x01
 #define AngleMode 0x02
-
-//Дискретность Регулятора, [мс]
-#define RegDisc 1										
 
 //Двигатель 1 LEFT
 #define ReadPhase_U1 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_0)
@@ -391,10 +359,10 @@ int main(void)
 	USART_Cmd(USART2, ENABLE);
 	//-------------------------------------------------------------------------------
 	str_to_usart("Program is ready\n\r");
-	control_hall_motor1();
+	//control_hall_motor1();
     while(1)
 
-    {	control_hall_motor1();
+    {	//control_hall_motor1();
 		if(DriveMode==0x02)
 		{
 			control_emf();
@@ -402,153 +370,74 @@ int main(void)
 		}
 		if(DriveMode==0x01) // Hall enable
 		{
-			//control_hall_motor1();
+			control_hall_motor1();
 			control_hall_motor2();
 		}
     }
 }
 //Обработчик прерывания юарт
+uint8_t command_buffer[6];
+uint8_t read_index;
 void USART2_IRQHandler(void)
 {
 	//-----------------------------------------------------------------------
 	//Обработчик прерывания на прием с компьютера
-	if(USART_GetITStatus(USART2, USART_IT_RXNE)==SET)
+	if(USART_GetITStatus(USART2, USART_IT_RXNE) == SET)
 	{
 		//-----------------------------------------------------------------------
 		USART_ClearITPendingBit(USART2,USART_IT_RXNE);
-		Receive_buf[BufWr] = USART_ReceiveData(USART2);// Закидываем байт в буфер
-		BufFill++;                                    // Говорим что его размер увеличился на 1
-		BufWr++;                                      // Чтобы следуюющий пришедший байт не перетер этот смещаем индекс на 1
-		tBufFill=BufFill; // Временная переменная для поиска 5 байт
-		tBufRd=BufRd;
-		while(BufFill>=6) // Если в буфере 5 байт или больше
+
+		Receive_buf[BufWr] = USART_ReceiveData(USART2); // Закидываем байт в буфер
+		BufFill++;                                      // Говорим что его размер увеличился на 1
+		BufWr++;                                        // Чтобы следуюющий пришедший байт не перетер этот смещаем индекс на 1
+
+		while(BufFill>5) // Если в буфере 5 байт или больше
 		{ 	
-			Receive=0; // счетчик байтов
-			while(Receive<=5) // Заберем 5 байт
+			// Теперь проверим что это наш пакет
+			// 0б - 0х00 | 1б - скорость лево | 2б - скорость право | 3б - режим | 4б - \n | 5б - \r
+			if ((Receive_buf[read_index] == 0x00) && (Receive_buf[read_index + 4] == 0x0A) && (Receive_buf[read_index + 5] == 0x0D))
 			{
-				Temp_buf[Receive]=Receive_buf[tBufRd];
-				// Receive_buf[tBufRd] = 0;
-				Receive++;
-				tBufFill--;
-				tBufRd++;
-				if(tBufRd==256) // Если мы прочитали 255й байт из массива, то следующий должен быть 0й индекс массива
-				{
-					tBufRd=0;
-				}
+				command_buffer[0] = Receive_buf[read_index + 1];
+				command_buffer[1] = Receive_buf[read_index + 2];
+				command_buffer[2] = Receive_buf[read_index + 3]; // DriveMode 0x01 - Hall, 0x02 - EMF, 0x00 - Disable
+
+				read_index = read_index + 6;
+				BufFill = BufFill - 6;
+
+				LeftDir = command_buffer[0] >> 7;
+				RightDir = command_buffer[1] >> 7;
+				if(LeftDir == 1)
+					LeftSpeed = ~command_buffer[0] + 0x01;
+				else
+					LeftSpeed = command_buffer[0];
+
+				if(RightDir == 1)
+					RightSpeed = ~command_buffer[1] + 0x01;
+				else
+					LeftSpeed = command_buffer[1];
+
+				TIM_SetCompare1(TIM1, (RightSpeed&0x7F)*15);
+				TIM_SetCompare2(TIM1, (RightSpeed&0x7F)*15);
+				TIM_SetCompare3(TIM1, (RightSpeed&0x7F)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
+
+				TIM_SetCompare1(TIM8, (LeftSpeed&0x7F)*15);
+				TIM_SetCompare2(TIM8, (LeftSpeed&0x7F)*15);
+				TIM_SetCompare3(TIM8, (LeftSpeed&0x7F)*15);
+
+				str_to_usart("ok");
+				int_to_usart((LeftSpeed&0x7F)*15);
 			}
-			// Теперь проверим что это наш пакет  0б - 0х00, 1б - скорость лево, 2б - скорость право, 3б - режим, 4б - \n, 5б - \r
-			//                                  0x0A                   0x0D
-			ControlMode = Temp_buf[0];
-
-			if((Temp_buf[4]=='\n')&&(Temp_buf[5]=='\r'))  // ищем наш опозновательный знак
+			else
 			{
-				switch(ControlMode)
-				{
-					case SpeedMode:
+				read_index = read_index + 1;
+				BufFill = BufFill - 1;
+			}
+			if(read_index > 255) // Если мы прочитали 255й байт из массива, то следующий должен быть 0й индекс массива
+				read_index=0;
 
-								LeftSpeed=Temp_buf[1]; // Забираем скорость
-								RightSpeed=Temp_buf[2];
-
-								LeftDir = !((LeftSpeed&0x80)>>7);
-								RightDir = ((RightSpeed&0x80)>>7);
-
-
-
-
-								int tmp = ((LeftSpeed&0xFE)>>1)*15;
-								char buf[13] = {'L',0,0,0,0,'R',0,0,0,0, '\n','\r',0};
-
-								buf[1] = (tmp%10000)/1000 + 48;
-								buf[2] = (tmp%1000)/100 + 48;
-								buf[3] = (tmp%100)/10 + 48;
-								buf[4] = (tmp%10) + 48;
-
-								tmp = ((RightSpeed&0xFE)>>1)*15;
-
-								buf[6] = (tmp%10000)/1000 + 48;
-								buf[7] = (tmp%1000)/100 + 48;
-								buf[8] = (tmp%100)/10 + 48;
-								buf[9] = tmp%10 + 48;
-
-								//str_to_usart(buf);
-
-								TIM_SetCompare1(TIM1, (RightSpeed&0x7F)*15);
-								TIM_SetCompare2(TIM1, (RightSpeed&0x7F)*15);
-								TIM_SetCompare3(TIM1, (RightSpeed&0x7F)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
-								TIM_SetCompare1(TIM8, (LeftSpeed&0x7F)*15);
-								TIM_SetCompare2(TIM8, (LeftSpeed&0x7F)*15);
-								TIM_SetCompare3(TIM8, (LeftSpeed&0x7F)*15);
-
-								DriveMode=Temp_buf[3];//0x01 - Hall, 0x02 - EMF, 0x00 - Disable
-
-								BufFill=tBufFill; // Присвоем текущие значения
-								BufRd=tBufRd;
-						break;
-
-					case WayMode:
-						LeftSpeed=Temp_buf[2]; // Забираем скорость
-						RightSpeed=Temp_buf[2];
-
-						LeftDir = !((LeftSpeed&0x80)>>7);
-						RightDir = ((RightSpeed&0x80)>>7);
-
-						TIM_SetCompare1(TIM1, (RightSpeed&0x7F)*15);
-						TIM_SetCompare2(TIM1, (RightSpeed&0x7F)*15);
-						TIM_SetCompare3(TIM1, (RightSpeed&0x7F)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
-						TIM_SetCompare1(TIM8, (LeftSpeed&0x7F)*15);
-						TIM_SetCompare2(TIM8, (LeftSpeed&0x7F)*15);
-						TIM_SetCompare3(TIM8, (LeftSpeed&0x7F)*15);
-
-						WayLength = Temp_buf[1]; //дописать формулу для длины исходя из количетсва оборотов колеса
-
-
-						break;
-
-					case AngleMode:
-						LeftSpeed=Temp_buf[2]; // Забираем скорость
-						RightSpeed=Temp_buf[2];
-
-						LeftDir = !((LeftSpeed&0x80)>>7);
-						RightDir = ((RightSpeed&0x80)>>7);
-
-						TIM_SetCompare1(TIM1, (RightSpeed&0x7F)*15);
-						TIM_SetCompare2(TIM1, (RightSpeed&0x7F)*15);
-						TIM_SetCompare3(TIM1, (RightSpeed&0x7F)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
-						TIM_SetCompare1(TIM8, (LeftSpeed&0x7F)*15);
-						TIM_SetCompare2(TIM8, (LeftSpeed&0x7F)*15);
-						TIM_SetCompare3(TIM8, (LeftSpeed&0x7F)*15);
-
-						RotateAngle = Temp_buf[1];
-						break;
-
-					default:
-						BufRd=BufRd+1;
-						if(BufRd>=256)
-						{
-							BufRd=0;
-						}
-						BufFill=BufFill-1;
-						break;
-
-				}//-------------END of switch
-			}//----------END of if
-			/*else // если опозновательный не найден сместимся на один байт
-			{
-				BufRd=BufRd+1;
-				if(BufRd>=256)
-				{
-					BufRd=0;
-				}
-				BufFill=BufFill-1;
-			}*/
-		}//---------------End of while
-		if(BufWr>=255)// Конец массива закольцуем на начало
-		{
-			BufWr=0;
-		}
-	}//-------------END of IF
-		//-----------------------------------------------------------------------
-}// END of Function
+		}// - end of While
+	}// - end of If
+}// - end of Function
 //-----------------------------------------------------------------------
 // Функция отправки строчки в юарт
 void str_to_usart(char* str)
@@ -560,6 +449,11 @@ void str_to_usart(char* str)
 		USART_SendData(USART2, str[TxCount]);
 		TxCount++;
 	}
+}
+void int_to_usart(uint16_t val)
+{
+		while(USART_GetFlagStatus(USART2, USART_FLAG_TC)== RESET){}
+		USART_SendData(USART2, val);
 }
 void delay_ms(uint16_t del_temp)
 {
@@ -576,34 +470,24 @@ void SysTick_Handler(void) // Таймер 1мс
 	if(delay_timeBLDC2>0)
 		delay_timeBLDC2--;
 
-	if(RegTime < RegDisc) RegTime++;
-	else {
-		/*
-		LeftDir = !((RegOut(LeftSpeed)&0x80)>>7);
-		RightDir = ((RegOut(RightSpeed)&0x80)>>7);
-
-		TIM_SetCompare1(TIM1, (RegOut(RightSpeed)&0x7F)*15);
-		TIM_SetCompare2(TIM1, (RegOut(RightSpeed)&0x7F)*15);
-		TIM_SetCompare3(TIM1, (RegOut(RightSpeed)&0x7F)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
-		TIM_SetCompare1(TIM8, (RegOut(LeftSpeed)&0x7F)*15);
-		TIM_SetCompare2(TIM8, (RegOut(LeftSpeed)&0x7F)*15);
-		TIM_SetCompare3(TIM8, (RegOut(LeftSpeed)&0x7F)*15);
-		*/
-		RegTime = 0;
-	}
-	
-	if (SpeedSendTime < 5000)							//счетчик на 5 сек для отправки скорости
+	if (SpeedSendTime < 1000)
 		SpeedSendTime++;
 	else
 	{
-		/*CurrentSpeed = HallCounter/14*60;
-		char buf[6] = {0,0,0,' '};
-		buf[0] = (HallCounter%1000)/100 + 48;
-		buf[1] = (HallCounter%100)/10 + 48;
-		buf[2] = (HallCounter%10) + 48;
-		str_to_usart(buf);*/
-		USART_SendData(USART2, HallCounter1);
-		HallCounter = 0;
+		//CurrentSpeed = HallCounter/14*60;
+		char buf[14] = {'B','L',0,0,0,0,'R',0,0,0,0, '\n','\r',0};
+		buf[2] = (RightHallCounter%10000)/1000 + 48;
+		buf[3] = (RightHallCounter%1000)/100 + 48;
+		buf[4] = (RightHallCounter%100)/10 + 48;
+		buf[5] = (RightHallCounter%10) + 48;
+
+		buf[7] = (LeftHallCounter)/1000 + 48;
+		buf[8] = (LeftHallCounter%1000)/100 + 48;
+		buf[9] = (LeftHallCounter%100)/10 + 48;
+		buf[10] = LeftHallCounter%10 + 48;
+		//str_to_usart(buf);
+		LeftHallCounter = 0;
+		RightHallCounter = 0;
 		SpeedSendTime = 0;
 	}
 
@@ -620,21 +504,6 @@ void SysTick_Handler(void) // Таймер 1мс
 	}
 }
 
-int16_t RegOut(uint16_t RegIn) {														//Функция ПИД-регулятора
-	int16_t diff = RegIn-CurrentSpeed;													//Сигнал после входного сумматора
-	int16_t output = (diff)*(RegPKoef+RegIKoef*RegIBuf+RegDKoef*(diff-RegDBuf));		//выходной сигнал регулятора
-	
-	RegDBuf = diff;																		//Сохранение предыдущего значения для Д-составляющей
-	if((RegIBuf+diff < 32767) && (RegIBuf+diff > -32767)) RegIBuf += diff;				//Накопление значения для И-составляющей с защитой от переполнения
-	
-	if(output<0) {																		//Переводим отприцательную скорость в требуемый формат
-		output *= -1;
-		output = output&0x80;
-	}
-	
-	return output;
-}
-
 //-------------------------------------------------------------------------------
 // Управление по датчикам холла ДВИГАТЕЛЬ 1 LEFT
 void control_hall_motor1(void)
@@ -644,6 +513,11 @@ void control_hall_motor1(void)
 		hallph1=ReadStateHall1Motor1^LeftDir;
 		hallph2=ReadStateHall2Motor1^LeftDir;
 		hallph3=ReadStateHall3Motor1^LeftDir;
+
+		if(CurrentHallState1!=LeftPrevHallState) {
+			LeftPrevHallState = CurrentHallState1;
+			LeftHallCounter++;
+		}
 
 		if(hallph1 == 0 && hallph2 == 0 && hallph3 == 1)
 		{
@@ -656,6 +530,7 @@ void control_hall_motor1(void)
 				Disable_Lo_U1;
 				Disable_Lo_V1;
 				Enable_Lo_W1; // W -
+
 			}
 		}
 		else if(hallph1 == 0 && hallph2 == 1 && hallph3 == 1)
@@ -682,6 +557,7 @@ void control_hall_motor1(void)
 				Disable_Lo_U1;
 				Enable_Lo_V1;    // V -
 				CurrentHallState1=3;
+
 			}
 		}
 		else if(hallph1 == 1 && hallph2 == 1 && hallph3 == 0)
@@ -724,14 +600,6 @@ void control_hall_motor1(void)
 			}
 		}
 		//delay_ms(4);
-		if(CurrentHallState1-(PrevHallState1%6)>0) {
-			PrevHallState = CurrentHallState1;
-			HallCounter++;
-		}
-		else if((CurrentHallState1%6)-PrevHallState1<0) {
-			PrevHallState = CurrentHallState1;
-			HallCounter--;
-		}
 	}
 }
 // Управление по датчикам холла ДВИГАТЕЛЬ 2 RIGHT
@@ -742,6 +610,11 @@ void control_hall_motor2(void)
 		hallph1=ReadStateHall1Motor2^RightDir;
 		hallph2=ReadStateHall2Motor2^RightDir;
 		hallph3=ReadStateHall3Motor2^RightDir;
+
+		if(CurrentHallState2!=RightPrevHallState) {
+			RightPrevHallState = CurrentHallState2;
+			RightHallCounter++;
+		}
 
 		if(hallph1 == 0 && hallph2 == 0 && hallph3 == 1)
 		{
@@ -820,14 +693,6 @@ void control_hall_motor2(void)
 				Enable_Lo_U2;    // U -
 				CurrentHallState2=6;
 			}
-		}
-		if(CurrentHallState2-(PrevHallState2%6)>0) {
-			PrevHallState = CurrentHallState1;
-			HallCounter++;
-		}
-		else if((CurrentHallState2%6)-PrevHallState2<0) {
-			PrevHallState = CurrentHallState1;
-			HallCounter--;
 		}
 	}
 }
@@ -1220,7 +1085,7 @@ void control_emf_2(void)
 // END void control EMF 2
 void disable_tim_chanels(void)
 {
-	TIM_CCxCmd(TIM4, TIM_Channel_1, TIM_CCx_Disable);
-	TIM_CCxCmd(TIM4, TIM_Channel_2, TIM_CCx_Disable);
-	TIM_CCxCmd(TIM4, TIM_Channel_3, TIM_CCx_Disable);
+	TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Disable);
+	TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Disable);
+	TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Disable);
 }

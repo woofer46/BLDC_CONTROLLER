@@ -312,7 +312,7 @@ int main(void)
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3 | GPIO_Pin_4;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
 	//-----------------------------------------------------------------------
 	// Вход с датчиков Холла, двигатель 2
@@ -525,21 +525,18 @@ void control_hall_motor1(void)
 		hall1 = 0;
 		hall1 = hallph1 | (hallph2<<1) | (hallph3<<2);
 
-		//int_to_usart(hall1);
-		//delay_ms(100);
-
 		if(hall1 == 0b100)// h1 = 0 h2 = 0 h3 = 1
-			next_state = 2;
-		else if(hall1 == 0b110) // 011
-			next_state = 3;
-		else if(hall1 == 0b010) // 010
-			next_state = 4;
-		else if(hall1 == 0b011) // 110
-			next_state = 5;
-		else if(hall1 == 0b001) // 100
 			next_state = 6;
-		else if(hall1 == 0b101) // 101
+		else if(hall1 == 0b110) // 011
 			next_state = 1;
+		else if(hall1 == 0b010) // 010
+			next_state = 2;
+		else if(hall1 == 0b011) // 110
+			next_state = 3;
+		else if(hall1 == 0b001) // 100
+			next_state = 4;
+		else if(hall1 == 0b101) // 101
+			next_state = 5;
 
 		if(next_state != state)
 		{

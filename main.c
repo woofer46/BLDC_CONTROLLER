@@ -339,7 +339,7 @@ int main(void)
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_USART2); //Rx Приемник
 
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
-	USART_InitUser.USART_BaudRate=115200;
+	USART_InitUser.USART_BaudRate=256000;
 	USART_InitUser.USART_HardwareFlowControl=USART_HardwareFlowControl_None;
 	USART_InitUser.USART_Mode=USART_Mode_Rx|USART_Mode_Tx;
 	USART_InitUser.USART_Parity=USART_Parity_No;
@@ -354,22 +354,23 @@ int main(void)
 	//control_hall_motor1();
     while(1)
 
-    {	//control_hall_motor1();
-		if(DriveMode==0x02)
-		{
-			control_emf();
-			control_emf_2();
-		}
-		if(DriveMode==0x01) // Hall enable
-		{
-			control_hall_motor1();
-			control_hall_motor2();
-		}
+    {
+    	//control_hall_motor2();
+		control_hall_motor1();
+    	//Disable_Lo_U1;
+    	//Enable_Lo_U1;
+    	//control_emf();
     }
 }
 //Обработчик прерывания юарт
 uint8_t command_buffer[6];
 uint8_t read_index = 0;
+#define LOG_SIZE 10000
+uint8_t log[LOG_SIZE];
+uint32_t log_w = 0;
+uint32_t log_r = 0;
+uint8_t log_start = 0;
+
 void USART2_IRQHandler(void)
 {
 	//-----------------------------------------------------------------------
@@ -389,6 +390,7 @@ void USART2_IRQHandler(void)
 			// 0б - 0х00 | 1б - скорость лево | 2б - скорость право | 3б - режим | 4б - \n | 5б - \r
 			if ((Receive_buf[read_index] == 0x00) && (Receive_buf[read_index + 4] == 0x0A) && (Receive_buf[read_index + 5] == 0x0D))
 			{
+				log_start = 1;
 				command_buffer[0] = Receive_buf[read_index + 1];
 				command_buffer[1] = Receive_buf[read_index + 2];
 				command_buffer[2] = Receive_buf[read_index + 3]; // DriveMode 0x01 - Hall, 0x02 - EMF, 0x00 - Disable
@@ -415,6 +417,8 @@ void USART2_IRQHandler(void)
 				TIM_SetCompare1(TIM8, (LeftSpeed&0x7F)*15);
 				TIM_SetCompare2(TIM8, (LeftSpeed&0x7F)*15);
 				TIM_SetCompare3(TIM8, (LeftSpeed&0x7F)*15);
+
+
 			}
 			else
 			{
@@ -446,6 +450,15 @@ void int_to_usart(uint16_t val)
 		while(USART_GetFlagStatus(USART2, USART_FLAG_TC)== RESET){}
 		USART_SendData(USART2, val);
 }
+
+void log_to_usart()
+{
+	while (log_r != LOG_SIZE)
+	{
+		int_to_usart(log[log_r]);
+		log_r++;
+	}
+}
 void delay_ms(uint16_t del_temp)
 {
 	del_count=del_temp;
@@ -466,19 +479,19 @@ void SysTick_Handler(void) // Таймер 1мс
 	else
 	{
 		//CurrentSpeed = HallCounter/14*60;
-		char buf[14] = {'B','L',0,0,0,0,'R',0,0,0,0, '\n','\r',0};
-		buf[2] = (RightHallCounter%10000)/1000 + 48;
-		buf[3] = (RightHallCounter%1000)/100 + 48;
-		buf[4] = (RightHallCounter%100)/10 + 48;
-		buf[5] = (RightHallCounter%10) + 48;
+		//char buf[14] = {'B','L',0,0,0,0,'R',0,0,0,0, '\n','\r',0};
+		//buf[2] = (RightHallCounter%10000)/1000 + 48;
+		//buf[3] = (RightHallCounter%1000)/100 + 48;
+		//buf[4] = (RightHallCounter%100)/10 + 48;
+		//buf[5] = (RightHallCounter%10) + 48;
 
-		buf[7] = (LeftHallCounter)/1000 + 48;
-		buf[8] = (LeftHallCounter%1000)/100 + 48;
-		buf[9] = (LeftHallCounter%100)/10 + 48;
-		buf[10] = LeftHallCounter%10 + 48;
+		//buf[7] = (LeftHallCounter)/1000 + 48;
+		//buf[8] = (LeftHallCounter%1000)/100 + 48;
+		//buf[9] = (LeftHallCounter%100)/10 + 48;
+		//buf[10] = LeftHallCounter%10 + 48;
 		//str_to_usart(buf);
-		LeftHallCounter = 0;
-		RightHallCounter = 0;
+		//LeftHallCounter = 0;
+		//RightHallCounter = 0;
 		SpeedSendTime = 0;
 	}
 
@@ -497,100 +510,112 @@ void SysTick_Handler(void) // Таймер 1мс
 
 //-------------------------------------------------------------------------------
 // Управление по датчикам холла ДВИГАТЕЛЬ 1 LEFT
+uint8_t hall1= 0;
+uint8_t next_state = 100;
+uint8_t state = 0;
+
+
 void control_hall_motor1(void)
 {
 	if(SetHallControl==1) // дополнительный флаг
 	{
-		hallph1=ReadStateHall1Motor1^LeftDir;
-		hallph2=ReadStateHall2Motor1^LeftDir;
-		hallph3=ReadStateHall3Motor1^LeftDir;
+		hallph1=ReadStateHall1Motor1;
+		hallph2=ReadStateHall2Motor1;
+		hallph3=ReadStateHall3Motor1;
+		hall1 = 0;
+		hall1 = hallph1 | (hallph2<<1) | (hallph3<<2);
 
-		if(CurrentHallState1!=LeftPrevHallState) {
-			LeftPrevHallState = CurrentHallState1;
-			LeftHallCounter++;
+		//int_to_usart(hall1);
+		//delay_ms(100);
+
+		if(hall1 == 0b100)// h1 = 0 h2 = 0 h3 = 1
+			next_state = 2;
+		else if(hall1 == 0b110) // 011
+			next_state = 3;
+		else if(hall1 == 0b010) // 010
+			next_state = 4;
+		else if(hall1 == 0b011) // 110
+			next_state = 5;
+		else if(hall1 == 0b001) // 100
+			next_state = 6;
+		else if(hall1 == 0b101) // 101
+			next_state = 1;
+
+		if(next_state != state)
+		{
+			state = next_state;
+			switch(state)
+			{
+				case 1:
+					Disable_Ho_U1;
+					Disable_Ho_V1;
+					Disable_Lo_W1;
+					Disable_Lo_U1;
+					Enable_Ho_W1;    // W +
+					Enable_Lo_V1;    // V -
+					break;
+				case 2:
+					Disable_Lo_V1;
+					Disable_Ho_U1;
+					Disable_Ho_V1;
+					Disable_Lo_W1;
+					Enable_Ho_W1;    // W +
+					Enable_Lo_U1;    // U -
+					break;
+				case 3:
+					Disable_Ho_W1;
+					Disable_Ho_U1;
+					Disable_Lo_W1;
+					Disable_Lo_V1;
+					Enable_Ho_V1;    // V +
+					Enable_Lo_U1;    // U -
+					break;
+				case 4:
+					Disable_Lo_U1;
+					Disable_Ho_U1;
+					Disable_Ho_W1;
+					Disable_Lo_V1;
+					Enable_Ho_V1;   // V +
+					Enable_Lo_W1;   // W -
+					break;
+				case 5:
+					Disable_Ho_V1;
+					Disable_Ho_W1;
+					Disable_Lo_U1;
+					Disable_Lo_V1;
+					Enable_Ho_U1;   // U +
+					Enable_Lo_W1;   // W -
+					break;
+				case 6:
+					Disable_Lo_W1;
+					Disable_Ho_V1;
+					Disable_Ho_W1;
+					Disable_Lo_U1;
+					Enable_Ho_U1;    // U +
+					Enable_Lo_V1;    // V -
+					break;
+			}
 		}
 
-		if(hallph1 == 0 && hallph2 == 0 && hallph3 == 1)
+		if (command_buffer[2]==0xFF)
 		{
-			if(CurrentHallState1!=1)
+			log_start=0;
+			//log_to_usart();
+		}
+		if(log_start == 1)
+		{
+			if(log_w<LOG_SIZE)
 			{
-				CurrentHallState1=1;
-				Disable_Ho_U1;
-				Disable_Ho_W1;
-				Enable_Ho_V1; // V +
-				Disable_Lo_U1;
-				Disable_Lo_V1;
-				Enable_Lo_W1; // W -
-
+				//log[log_w]=state;
+				//log_w++;
+				//delay_ms(1);
+			}
+			else
+			{
+				//str_to_usart("stoplog");
+				//delay_ms(500);
 			}
 		}
-		else if(hallph1 == 0 && hallph2 == 1 && hallph3 == 1)
-		{
-			if(CurrentHallState1!=2)
-			{
-				Disable_Ho_V1;
-				Disable_Ho_W1;
-				Enable_Ho_U1;   // U +
-				Disable_Lo_U1;
-				Disable_Lo_V1;
-				Enable_Lo_W1;   // W -
-				CurrentHallState1=2;
-			}
-		}
-		else if(hallph1 == 0 && hallph2 == 1 && hallph3 == 0)
-		{
-			if(CurrentHallState1!=3)
-			{
-				Disable_Ho_V1;
-				Disable_Ho_W1;
-				Enable_Ho_U1;    // U +
-				Disable_Lo_W1;
-				Disable_Lo_U1;
-				Enable_Lo_V1;    // V -
-				CurrentHallState1=3;
-
-			}
-		}
-		else if(hallph1 == 1 && hallph2 == 1 && hallph3 == 0)
-		{
-			if(CurrentHallState1!=4)
-			{
-				Disable_Ho_U1;
-				Disable_Ho_V1;
-				Enable_Ho_W1;    // W +
-				Disable_Lo_W1;
-				Disable_Lo_U1;
-				Enable_Lo_V1;    // V -
-				CurrentHallState1=4;
-			}
-		}
-		else if(hallph1 == 1 && hallph2 == 0 && hallph3 == 0)
-		{
-			if(CurrentHallState1!=5)
-			{
-				Disable_Ho_U1;
-				Disable_Ho_V1;
-				Enable_Ho_W1;    // W +
-				Disable_Lo_W1;
-				Disable_Lo_V1;
-				Enable_Lo_U1;    // U -
-				CurrentHallState1=5;
-			}
-		}
-		else if(hallph1 == 1 && hallph2 == 0 && hallph3 == 1)
-		{
-			if(CurrentHallState1!=6)
-			{
-				Disable_Ho_U1;
-				Disable_Ho_W1;
-				Enable_Ho_V1;    // V +
-				Disable_Lo_W1;
-				Disable_Lo_V1;
-				Enable_Lo_U1;    // U -
-				CurrentHallState1=6;
-			}
-		}
-		//delay_ms(4);
 	}
 }
 // Управление по датчикам холла ДВИГАТЕЛЬ 2 RIGHT

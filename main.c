@@ -510,108 +510,85 @@ void SysTick_Handler(void) // Таймер 1мс
 
 //-------------------------------------------------------------------------------
 // Управление по датчикам холла ДВИГАТЕЛЬ 1 LEFT
-uint8_t hall1= 0;
-uint8_t next_state = 100;
-uint8_t state = 0;
-
+uint8_t hall_motor1= 0;
+uint8_t state_m1 = 0;
+uint8_t prev_state_m1 = 100;
+uint8_t dir_motor1 = 1;
 
 void control_hall_motor1(void)
 {
-	if(SetHallControl==1) // дополнительный флаг
+	hall_motor1 = 0;
+
+	hall_motor1 = (ReadStateHall1Motor1) | (ReadStateHall2Motor1<<1) | (ReadStateHall3Motor1<<2);
+	if(dir_motor1 == 1)
+		hall_motor1 = (~hall_motor1) & 0x07;
+
+	if(hall_motor1 == 0b110) // 011
+		state_m1 = 1;
+	else if(hall_motor1 == 0b010) // 010
+		state_m1 = 2;
+	else if(hall_motor1 == 0b011) // 110
+		state_m1 = 3;
+	else if(hall_motor1 == 0b001) // 100
+		state_m1 = 4;
+	else if(hall_motor1 == 0b101) // 101
+		state_m1 = 5;
+	else if(hall_motor1 == 0b100) // h1 = 0 h2 = 0 h3 = 1
+		state_m1 = 6;
+
+	if(state_m1 != prev_state_m1)
 	{
-		hallph1=ReadStateHall1Motor1;
-		hallph2=ReadStateHall2Motor1;
-		hallph3=ReadStateHall3Motor1;
-		hall1 = 0;
-		hall1 = hallph1 | (hallph2<<1) | (hallph3<<2);
-
-		if(hall1 == 0b100)// h1 = 0 h2 = 0 h3 = 1
-			next_state = 6;
-		else if(hall1 == 0b110) // 011
-			next_state = 1;
-		else if(hall1 == 0b010) // 010
-			next_state = 2;
-		else if(hall1 == 0b011) // 110
-			next_state = 3;
-		else if(hall1 == 0b001) // 100
-			next_state = 4;
-		else if(hall1 == 0b101) // 101
-			next_state = 5;
-
-		if(next_state != state)
+		prev_state_m1 = state_m1;
+		switch(state_m1)
 		{
-			state = next_state;
-			switch(state)
-			{
-				case 1:
-					Disable_Ho_U1;
-					Disable_Ho_V1;
-					Disable_Lo_W1;
-					Disable_Lo_U1;
-					Enable_Ho_W1;    // W +
-					Enable_Lo_V1;    // V -
-					break;
-				case 2:
-					Disable_Lo_V1;
-					Disable_Ho_U1;
-					Disable_Ho_V1;
-					Disable_Lo_W1;
-					Enable_Ho_W1;    // W +
-					Enable_Lo_U1;    // U -
-					break;
-				case 3:
-					Disable_Ho_W1;
-					Disable_Ho_U1;
-					Disable_Lo_W1;
-					Disable_Lo_V1;
-					Enable_Ho_V1;    // V +
-					Enable_Lo_U1;    // U -
-					break;
-				case 4:
-					Disable_Lo_U1;
-					Disable_Ho_U1;
-					Disable_Ho_W1;
-					Disable_Lo_V1;
-					Enable_Ho_V1;   // V +
-					Enable_Lo_W1;   // W -
-					break;
-				case 5:
-					Disable_Ho_V1;
-					Disable_Ho_W1;
-					Disable_Lo_U1;
-					Disable_Lo_V1;
-					Enable_Ho_U1;   // U +
-					Enable_Lo_W1;   // W -
-					break;
-				case 6:
-					Disable_Lo_W1;
-					Disable_Ho_V1;
-					Disable_Ho_W1;
-					Disable_Lo_U1;
-					Enable_Ho_U1;    // U +
-					Enable_Lo_V1;    // V -
-					break;
-			}
-		}
-
-		if (command_buffer[2]==0xFF)
-		{
-			log_start=0;
-			//log_to_usart();
-		}
-		if(log_start == 1)
-		{
-			if(log_w<LOG_SIZE)
-			{
-				//log[log_w]=state;
-				//log_w++;
-				//delay_ms(1);
-			}
-			else
-			{
-				//str_to_usart("stoplog");
-				//delay_ms(500);
-			}
+			case 1:
+				Disable_Ho_U1;
+				Disable_Ho_V1;
+				Disable_Lo_W1;
+				Disable_Lo_U1;
+				Enable_Ho_W1;    // W +
+				Enable_Lo_V1;    // V -
+				break;
+			case 2:
+				Disable_Lo_V1;
+				Disable_Ho_U1;
+				Disable_Ho_V1;
+				Disable_Lo_W1;
+				Enable_Ho_W1;    // W +
+				Enable_Lo_U1;    // U -
+				break;
+			case 3:
+				Disable_Ho_W1;
+				Disable_Ho_U1;
+				Disable_Lo_W1;
+				Disable_Lo_V1;
+				Enable_Ho_V1;    // V +
+				Enable_Lo_U1;    // U -
+				break;
+			case 4:
+				Disable_Lo_U1;
+				Disable_Ho_U1;
+				Disable_Ho_W1;
+				Disable_Lo_V1;
+				Enable_Ho_V1;   // V +
+				Enable_Lo_W1;   // W -
+				break;
+			case 5:
+				Disable_Ho_V1;
+				Disable_Ho_W1;
+				Disable_Lo_U1;
+				Disable_Lo_V1;
+				Enable_Ho_U1;   // U +
+				Enable_Lo_W1;   // W -
+				break;
+			case 6:
+				Disable_Lo_W1;
+				Disable_Ho_V1;
+				Disable_Ho_W1;
+				Disable_Lo_U1;
+				Enable_Ho_U1;    // U +
+				Enable_Lo_V1;    // V -
+				break;
 		}
 	}
 }

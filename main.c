@@ -320,7 +320,7 @@ int main(void)
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7 | GPIO_Pin_10 | GPIO_Pin_11;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
 	//-----------------------------------------------------------
 	// Настройка USART
@@ -355,7 +355,7 @@ int main(void)
     while(1)
 
     {
-    	//control_hall_motor2();
+    	control_hall_motor2();
 		control_hall_motor1();
     	//Disable_Lo_U1;
     	//Enable_Lo_U1;
@@ -515,10 +515,10 @@ uint8_t state_m1 = 0;
 uint8_t prev_state_m1 = 100;
 uint8_t dir_motor1 = 1;
 
+
 void control_hall_motor1(void)
 {
 	hall_motor1 = 0;
-
 	hall_motor1 = (ReadStateHall1Motor1) | (ReadStateHall2Motor1<<1) | (ReadStateHall3Motor1<<2);
 	if(dir_motor1 == 1)
 		hall_motor1 = (~hall_motor1) & 0x07;
@@ -592,97 +592,87 @@ void control_hall_motor1(void)
 		}
 	}
 }
-// Управление по датчикам холла ДВИГАТЕЛЬ 2 RIGHT
+//-------------------------------------------------------------------------------
+// Управление по датчикам холла ДВИГАТЕЛЬ 2 R
+uint8_t hall_motor2= 0;
+uint8_t state_m2 = 0;
+uint8_t prev_state_m2 = 100;
+uint8_t dir_motor2 = 0;
+
+
 void control_hall_motor2(void)
 {
-	if(SetHallControl==1)
+	hall_motor2 = 0;
+	hall_motor2 = (ReadStateHall1Motor2) | (ReadStateHall2Motor2<<1) | (ReadStateHall3Motor2<<2);
+	if(dir_motor2 == 1)
+		hall_motor2 = (~hall_motor2) & 0x07;
+
+	if(hall_motor2 == 0b110) // 011
+		state_m2 = 1;
+	else if(hall_motor2 == 0b010) // 010
+		state_m2 = 2;
+	else if(hall_motor2 == 0b011) // 110
+		state_m2 = 3;
+	else if(hall_motor2 == 0b001) // 100
+		state_m2 = 4;
+	else if(hall_motor2 == 0b101) // 101
+		state_m2 = 5;
+	else if(hall_motor2 == 0b100) // h1 = 0 h2 = 0 h3 = 1
+		state_m2 = 6;
+
+	if(state_m2 != prev_state_m2)
 	{
-		hallph1=ReadStateHall1Motor2^RightDir;
-		hallph2=ReadStateHall2Motor2^RightDir;
-		hallph3=ReadStateHall3Motor2^RightDir;
-
-		if(CurrentHallState2!=RightPrevHallState) {
-			RightPrevHallState = CurrentHallState2;
-			RightHallCounter++;
-		}
-
-		if(hallph1 == 0 && hallph2 == 0 && hallph3 == 1)
+		prev_state_m2 = state_m2;
+		switch(state_m2)
 		{
-			if(CurrentHallState2!=1)
-			{
+			case 1:
 				Disable_Ho_U2;
-				Disable_Ho_W2;
-				Enable_Ho_V2; // V +
-				Disable_Lo_U2;
-				Disable_Lo_V2;
-				Enable_Lo_W2; // W -
-				CurrentHallState2=1;
-			}
-		}
-		else if(hallph1 == 0 && hallph2 == 1 && hallph3 == 1)
-		{
-			if(CurrentHallState2!=2)
-			{
 				Disable_Ho_V2;
-				Disable_Ho_W2;
-				Enable_Ho_U2;   // U +
-				Disable_Lo_U2;
-				Disable_Lo_V2;
-				Enable_Lo_W2;   // W -
-				CurrentHallState2=2;
-			}
-		}
-		else if(hallph1 == 0 && hallph2 == 1 && hallph3 == 0)
-		{
-			if(CurrentHallState2!=3)
-			{
-				Disable_Ho_V2;
-				Disable_Ho_W2;
-				Enable_Ho_U2;    // U +
 				Disable_Lo_W2;
 				Disable_Lo_U2;
-				Enable_Lo_V2;    // V -
-				CurrentHallState2=3;
-			}
-		}
-		else if(hallph1 == 1 && hallph2 == 1 && hallph3 == 0)
-		{
-			if(CurrentHallState2!=4)
-			{
-				Disable_Ho_U2;
-				Disable_Ho_V2;
 				Enable_Ho_W2;    // W +
-				Disable_Lo_W2;
-				Disable_Lo_U2;
 				Enable_Lo_V2;    // V -
-				CurrentHallState2=4;
-			}
-		}
-		else if(hallph1 == 1 && hallph2 == 0 && hallph3 == 0)
-		{
-			if(CurrentHallState2!=5)
-			{
+				break;
+			case 2:
+				Disable_Lo_V2;
 				Disable_Ho_U2;
 				Disable_Ho_V2;
-				Enable_Ho_W2;    // W +
 				Disable_Lo_W2;
-				Disable_Lo_V2;
+				Enable_Ho_W2;    // W +
 				Enable_Lo_U2;    // U -
-				CurrentHallState2=5;
-			}
-		}
-		else if(hallph1 == 1 && hallph2 == 0 && hallph3 == 1)
-		{
-			if(CurrentHallState2!=6)
-			{
-				Disable_Ho_U2;
+				break;
+			case 3:
 				Disable_Ho_W2;
+				Disable_Ho_U2;
+				Disable_Lo_W2;
+				Disable_Lo_V2;
 				Enable_Ho_V2;    // V +
-				Disable_Lo_W2;
-				Disable_Lo_V2;
 				Enable_Lo_U2;    // U -
-				CurrentHallState2=6;
-			}
+				break;
+			case 4:
+				Disable_Lo_U2;
+				Disable_Ho_U2;
+				Disable_Ho_W2;
+				Disable_Lo_V2;
+				Enable_Ho_V2;   // V +
+				Enable_Lo_W2;   // W -
+				break;
+			case 5:
+				Disable_Ho_V2;
+				Disable_Ho_W2;
+				Disable_Lo_U2;
+				Disable_Lo_V2;
+				Enable_Ho_U2;   // U +
+				Enable_Lo_W2;   // W -
+				break;
+			case 6:
+				Disable_Lo_W2;
+				Disable_Ho_V2;
+				Disable_Ho_W2;
+				Disable_Lo_U2;
+				Enable_Ho_U2;    // U +
+				Enable_Lo_V2;    // V -
+				break;
 		}
 	}
 }

@@ -1,14 +1,13 @@
-﻿// Svyatoslav Mishin 2014-2016
+﻿// Svyatoslav Mishin 2014-2017
 // Brushless EMF controllers
 // Anton Proskunin 2016
 // Andrey Pushin 2016
 
 #include <stm32f4xx_conf.h>
+#include "hall_control.h"
 
 
-TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;      // Определение структуры инициализауии таймеров
-TIM_OCInitTypeDef  TIM_OCInitStructure;              // Определение структуры для настройки PWM
-uint16_t PrescalerValue = 0;                         // Определение предделителей для таймеров, ШИМ
+
 uint16_t del_count=0;                                // Счетчик для фунции delay_ms
 uint16_t delay_timeBLDC1=0;                          // Счетчик задержки коммутирования состояния для бездатчикового управления (Двиг 1)
 uint16_t delay_timeBLDC2=0;                          // --//--//-- (Двиг 2)
@@ -28,8 +27,7 @@ uint8_t current_stateBLDC1 =0;                       // Флаг того что
 uint8_t previous_stateBLDC1 =0;                      // Предыдущее состояние
 uint8_t CountStates_statesBLDC1 = 0;                 // Счетчик количества переключений по состояниям (для регулятора)
 uint8_t emf_delayBLDC1=19;//3                        // Время удержания состояния (Обр Эдс)
-uint16_t LeftHallCounter = 0;							// Счетчик тиков состояния
-uint16_t RightHallCounter = 0;
+
 uint16_t HallCounterState = 42;
 uint16_t SpeedSendTime = 0;							// тестируем измерение скорости
 uint8_t count_step_statesBLDC2=0;
@@ -91,201 +89,13 @@ void disable_tim_chanels(void);
 #define ReadPhase_U2 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_3)
 #define ReadPhase_V2 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_4)
 #define ReadPhase_W2 GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_5)
-//Двигатель 1 LEFT
-#define Disable_Ho_U1 TIM_CCxCmd(TIM8, TIM_Channel_1, TIM_CCx_Disable);
-#define Disable_Ho_V1 TIM_CCxCmd(TIM8, TIM_Channel_2, TIM_CCx_Disable);
-#define Disable_Ho_W1 TIM_CCxCmd(TIM8, TIM_Channel_3, TIM_CCx_Disable);
-
-#define Enable_Ho_U1 TIM_CCxCmd(TIM8, TIM_Channel_1, TIM_CCx_Enable);
-#define Enable_Ho_V1 TIM_CCxCmd(TIM8, TIM_Channel_2, TIM_CCx_Enable);
-#define Enable_Ho_W1 TIM_CCxCmd(TIM8, TIM_Channel_3, TIM_CCx_Enable);
-
-//Двигатель 2 RIGHT
-#define Disable_Ho_U2 TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Disable);
-#define Disable_Ho_V2 TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Disable);
-#define Disable_Ho_W2 TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Disable);
-
-#define Enable_Ho_U2 TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Enable);
-#define Enable_Ho_V2 TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Enable);
-#define Enable_Ho_W2 TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Enable);
-
-//Двигатель 1 LEFT
-#define Disable_Lo_U1 GPIO_ResetBits(GPIOA, GPIO_Pin_7);
-#define Disable_Lo_V1 GPIO_ResetBits(GPIOB, GPIO_Pin_0);
-#define Disable_Lo_W1 GPIO_ResetBits(GPIOB, GPIO_Pin_1);
-
-#define Enable_Lo_U1 GPIO_SetBits(GPIOA, GPIO_Pin_7);
-#define Enable_Lo_V1 GPIO_SetBits(GPIOB, GPIO_Pin_0);
-#define Enable_Lo_W1 GPIO_SetBits(GPIOB, GPIO_Pin_1);
-
-//Двигатель 2 RIGHT
-#define Disable_Lo_U2 GPIO_ResetBits(GPIOB, GPIO_Pin_13);
-#define Disable_Lo_V2 GPIO_ResetBits(GPIOB, GPIO_Pin_14);
-#define Disable_Lo_W2 GPIO_ResetBits(GPIOB, GPIO_Pin_15);
-
-#define Enable_Lo_U2 GPIO_SetBits(GPIOB, GPIO_Pin_13);
-#define Enable_Lo_V2 GPIO_SetBits(GPIOB, GPIO_Pin_14);
-#define Enable_Lo_W2 GPIO_SetBits(GPIOB, GPIO_Pin_15);
-
-// Чтение состояний датчиков холла для двигателя 1 LEFT
-#define ReadStateHall1Motor1 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_2)
-#define ReadStateHall2Motor1 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_3)
-#define ReadStateHall3Motor1 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_4)
-
-// Чтение состояний датчиков холла для двигателя 2 RIGHT
-#define ReadStateHall1Motor2 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_7)
-#define ReadStateHall2Motor2 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_10)
-#define ReadStateHall3Motor2 GPIO_ReadInputDataBit(GPIOD, GPIO_Pin_11)
-
-
-
+uint8_t dir_motor1 = 0;//r
+uint8_t dir_motor2 = 0;//l
 int main(void)
 {
 	SystemInit();
 	SysTick_Config(SystemCoreClock/1000);
 
-	GPIO_InitTypeDef GPIO_InitStructure; // Стукрутра инициализации GPIO
-	//-----------------------------------------------------------------------
-	// Включение тактирования Таймеров
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM8, ENABLE);
-	//-----------------------------------------------------------------------
-	// Включение тактирования GPIO
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOE, ENABLE);
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
-	//-----------------------------------------------------------------------
-	// Двигатель 2, верхние ключи
-	//-----------------------------------------------------------------------
-    // Конфигурация портов TIM1 CH1(PA8), CH2(PE11), CH3(PA10)
-	GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_8|GPIO_Pin_10;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
-	GPIO_Init(GPIOE, &GPIO_InitStructure);
-	//-----------------------------------------------------------------------
-	// Подключение портов к альтернативной функции TIM1
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource8, GPIO_AF_TIM1);
-	GPIO_PinAFConfig(GPIOE, GPIO_PinSource11, GPIO_AF_TIM1);
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_TIM1);
-	//-----------------------------------------------------------------------
-	// Двигатель 1, верхние ключи
-	//-----------------------------------------------------------------------
-	// Конфигурация портов TIM8 CH1(PC6), CH2(PC7), CH3(PC8)
-	GPIO_InitStructure.GPIO_Pin =  GPIO_Pin_6|GPIO_Pin_7|GPIO_Pin_8;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
-	GPIO_Init(GPIOC, &GPIO_InitStructure);
-	//-----------------------------------------------------------------------
-	// Подключение портов к альтернативной функции TIM8
-    GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_TIM8);
-    GPIO_PinAFConfig(GPIOC, GPIO_PinSource7, GPIO_AF_TIM8);
-    GPIO_PinAFConfig(GPIOC, GPIO_PinSource8, GPIO_AF_TIM8);
-	//-----------------------------------------------------------------------
-    // Настройка таймеров
-    // *To get TIM3 counter clock at 28 MHz, the prescaler is computed as follows:
-    // *Prescaler = (TIM3CLK / TIM3 counter clock) - 1
-    // *Prescaler = ((SystemCoreClock /2) /28 MHz) - 1
-    //-----------------------------------------------------------------------
-    PrescalerValue = (uint16_t) ((SystemCoreClock /2) / 28000000) - 1;
-    //-----------------------------------------------------------------------
-    // Настройка TIM1 Двигатель 2 RIGHT
-    TIM_TimeBaseStructure.TIM_Period=2000;
-    TIM_TimeBaseStructure.TIM_Prescaler = PrescalerValue;
-    TIM_TimeBaseStructure.TIM_ClockDivision = 0;
-    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
-    // PWM mode
-    TIM_OCInitStructure.TIM_OCMode=TIM_OCMode_PWM1;
-    TIM_OCInitStructure.TIM_OutputState=TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_Pulse=100;
-    TIM_OCInitStructure.TIM_OCPolarity=TIM_OCPolarity_High;
-    //TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Set;
-    // CH1
-    TIM_OC1Init(TIM1, &TIM_OCInitStructure);
-    TIM_OC1PreloadConfig(TIM1, TIM_OCPreload_Enable);
-    // CH2
-    TIM_OC2Init(TIM1, &TIM_OCInitStructure);
-    TIM_OC2PreloadConfig(TIM1, TIM_OCPreload_Enable);
-    // CH3
-    TIM_OC3Init(TIM1, &TIM_OCInitStructure);
-    TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
-    // Предзагрузка
-    TIM_ARRPreloadConfig(TIM1, ENABLE);
-    //-----------------------------------------------------------------------
-    // Настройка TIM8 Двигатель 1 LEFT
-    TIM_TimeBaseStructure.TIM_Period=2000;
-    TIM_TimeBaseStructure.TIM_Prescaler = PrescalerValue;
-    TIM_TimeBaseStructure.TIM_ClockDivision = 0;
-    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseInit(TIM8, &TIM_TimeBaseStructure);
-    // PWM mode
-    TIM_OCInitStructure.TIM_OCMode=TIM_OCMode_PWM1;
-    TIM_OCInitStructure.TIM_OutputState=TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_Pulse=100;
-    TIM_OCInitStructure.TIM_OCPolarity=TIM_OCPolarity_High;
-    //TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Set;
-    // CH1
-    TIM_OC1Init(TIM8, &TIM_OCInitStructure);
-    TIM_OC1PreloadConfig(TIM8, TIM_OCPreload_Enable);
-    // CH2
-    TIM_OC2Init(TIM8, &TIM_OCInitStructure);
-    TIM_OC2PreloadConfig(TIM8, TIM_OCPreload_Enable);
-    // CH3
-    TIM_OC3Init(TIM8, &TIM_OCInitStructure);
-    TIM_OC3PreloadConfig(TIM8, TIM_OCPreload_Enable);
-    // Предзагрузка
-    TIM_ARRPreloadConfig(TIM8, ENABLE);
-    //-----------------------------------------------------------------------
-    // Включение TIM1 и TIM8
-    TIM_CtrlPWMOutputs(TIM1, ENABLE);
-    TIM_Cmd(TIM1, ENABLE);
-	TIM_CCxCmd(TIM1, TIM_Channel_1, TIM_CCx_Disable);
-	TIM_CCxCmd(TIM1, TIM_Channel_2, TIM_CCx_Disable);
-	TIM_CCxCmd(TIM1, TIM_Channel_3, TIM_CCx_Disable);
-	//-----------------------------------------------------------------------
-    TIM_CtrlPWMOutputs(TIM8, ENABLE);
-    TIM_Cmd(TIM8, ENABLE);
-	TIM_CCxCmd(TIM8, TIM_Channel_1, TIM_CCx_Disable);
-	TIM_CCxCmd(TIM8, TIM_Channel_2, TIM_CCx_Disable);
-	TIM_CCxCmd(TIM8, TIM_Channel_3, TIM_CCx_Disable);
-    //-----------------------------------------------------------------------
-    //-----------------------------------------------------------------------
-    // Двигатель 2, нижние ключи PB13, PB14, PB15
-    //-----------------------------------------------------------------------
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13 | GPIO_Pin_14| GPIO_Pin_15;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
-	//-----------------------------------------------------------------------
-    // Двигатель 1, нижние ключи PA7, PB0, PB1
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-	//-------------------------------------------------------------------------------
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
 	//-----------------------------------------------------------------------
 	// Двигатель 1, вход с компараторов PС0, PС1, PС2
 	GPIO_InitTypeDef GPIO_InitComparator;
@@ -305,23 +115,7 @@ int main(void)
 	GPIO_InitComparator.GPIO_Speed = GPIO_Speed_100MHz;
 	GPIO_InitComparator.GPIO_PuPd = GPIO_PuPd_UP;//Подтянуть
 	GPIO_Init(GPIOC, &GPIO_InitComparator);
-	//-----------------------------------------------------------------------
-	// Вход с датчиков Холла, двигатель 1
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3 | GPIO_Pin_4;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	GPIO_Init(GPIOD, &GPIO_InitStructure);
-	//-----------------------------------------------------------------------
-	// Вход с датчиков Холла, двигатель 2
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7 | GPIO_Pin_10 | GPIO_Pin_11;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	GPIO_Init(GPIOD, &GPIO_InitStructure);
-	//-----------------------------------------------------------
+
 	// Настройка USART
 	GPIO_InitTypeDef  GPIO_InitUSART;
 	USART_InitTypeDef USART_InitUser;
@@ -351,11 +145,13 @@ int main(void)
 	//-------------------------------------------------------------------------------
 	//str_to_usart("Program is ready\n\r");
 	//control_hall_motor1();
+
+	hall_sensor_init();
     while(1)
 
     {
-    	control_hall_motor2();
-		control_hall_motor1();
+    	control_hall_motor2(dir_motor2);
+		control_hall_motor1(dir_motor1);
     	//Disable_Lo_U1;
     	//Enable_Lo_U1;
     	//control_emf();
@@ -378,8 +174,7 @@ uint32_t log_w = 0;
 uint32_t log_r = 0;
 uint8_t log_start = 0;
 
-uint8_t dir_motor1 = 0;//r
-uint8_t dir_motor2 = 0;//l
+
 
 void read_uart(void)
 {
@@ -520,8 +315,8 @@ void SysTick_Handler(void) // Таймер 1мс
 		char buffer[12];
 
 
-		LeftHallCounter = 0;
-		RightHallCounter = 0;
+		//LeftHallCounter = 0;
+		//RightHallCounter = 0;
 		SpeedSendTime = 0;
 	}
     /*
@@ -544,177 +339,6 @@ void SysTick_Handler(void) // Таймер 1мс
 	}*/
 }
 
-//-------------------------------------------------------------------------------
-// Управление по датчикам холла ДВИГАТЕЛЬ 1 Right
-uint8_t hall_motor1= 0;
-uint8_t state_m1 = 0;
-uint8_t prev_state_m1 = 100;
-
-
-
-void control_hall_motor1(void)//Right motor
-{
-	hall_motor1 = 0;
-	hall_motor1 = (ReadStateHall1Motor1) | (ReadStateHall2Motor1<<1) | (ReadStateHall3Motor1<<2);
-	if(dir_motor1 == 1)
-		hall_motor1 = (~hall_motor1) & 0x07;
-
-	if(hall_motor1 == 0b110) // 011
-		state_m1 = 1;
-	else if(hall_motor1 == 0b010) // 010
-		state_m1 = 2;
-	else if(hall_motor1 == 0b011) // 110
-		state_m1 = 3;
-	else if(hall_motor1 == 0b001) // 100
-		state_m1 = 4;
-	else if(hall_motor1 == 0b101) // 101
-		state_m1 = 5;
-	else if(hall_motor1 == 0b100) // h1 = 0 h2 = 0 h3 = 1
-		state_m1 = 6;
-
-	if(state_m1 != prev_state_m1)
-	{
-		prev_state_m1 = state_m1;
-		RightHallCounter++;
-		switch(state_m1)
-		{
-			case 1:
-				Disable_Ho_U1;
-				Disable_Ho_V1;
-				Disable_Lo_W1;
-				Disable_Lo_U1;
-				Enable_Ho_W1;    // W +
-				Enable_Lo_V1;    // V -
-				break;
-			case 2:
-				Disable_Lo_V1;
-				Disable_Ho_U1;
-				Disable_Ho_V1;
-				Disable_Lo_W1;
-				Enable_Ho_W1;    // W +
-				Enable_Lo_U1;    // U -
-				break;
-			case 3:
-				Disable_Ho_W1;
-				Disable_Ho_U1;
-				Disable_Lo_W1;
-				Disable_Lo_V1;
-				Enable_Ho_V1;    // V +
-				Enable_Lo_U1;    // U -
-				break;
-			case 4:
-				Disable_Lo_U1;
-				Disable_Ho_U1;
-				Disable_Ho_W1;
-				Disable_Lo_V1;
-				Enable_Ho_V1;   // V +
-				Enable_Lo_W1;   // W -
-				break;
-			case 5:
-				Disable_Ho_V1;
-				Disable_Ho_W1;
-				Disable_Lo_U1;
-				Disable_Lo_V1;
-				Enable_Ho_U1;   // U +
-				Enable_Lo_W1;   // W -
-				break;
-			case 6:
-				Disable_Lo_W1;
-				Disable_Ho_V1;
-				Disable_Ho_W1;
-				Disable_Lo_U1;
-				Enable_Ho_U1;    // U +
-				Enable_Lo_V1;    // V -
-				break;
-		}
-	}
-}
-//-------------------------------------------------------------------------------
-// Управление по датчикам холла ДВИГАТЕЛЬ 2 Left
-uint8_t hall_motor2= 0;
-uint8_t state_m2 = 0;
-uint8_t prev_state_m2 = 100;
-
-
-
-void control_hall_motor2(void)
-{
-	hall_motor2 = 0;
-	hall_motor2 = (ReadStateHall1Motor2) | (ReadStateHall2Motor2<<1) | (ReadStateHall3Motor2<<2);
-	if(dir_motor2 == 0)
-		hall_motor2 = (~hall_motor2) & 0x07;
-
-	if(hall_motor2 == 0b110) // 011
-		state_m2 = 1;
-	else if(hall_motor2 == 0b010) // 010
-		state_m2 = 2;
-	else if(hall_motor2 == 0b011) // 110
-		state_m2 = 3;
-	else if(hall_motor2 == 0b001) // 100
-		state_m2 = 4;
-	else if(hall_motor2 == 0b101) // 101
-		state_m2 = 5;
-	else if(hall_motor2 == 0b100) // h1 = 0 h2 = 0 h3 = 1
-		state_m2 = 6;
-
-	if(state_m2 != prev_state_m2)
-	{
-		prev_state_m2 = state_m2;
-		LeftHallCounter++;
-		switch(state_m2)
-		{
-			case 1:
-				Disable_Ho_U2;
-				Disable_Ho_V2;
-				Disable_Lo_W2;
-				Disable_Lo_U2;
-				Enable_Ho_W2;    // W +
-				Enable_Lo_V2;    // V -
-				break;
-			case 2:
-				Disable_Lo_V2;
-				Disable_Ho_U2;
-				Disable_Ho_V2;
-				Disable_Lo_W2;
-				Enable_Ho_W2;    // W +
-				Enable_Lo_U2;    // U -
-				break;
-			case 3:
-				Disable_Ho_W2;
-				Disable_Ho_U2;
-				Disable_Lo_W2;
-				Disable_Lo_V2;
-				Enable_Ho_V2;    // V +
-				Enable_Lo_U2;    // U -
-				break;
-			case 4:
-				Disable_Lo_U2;
-				Disable_Ho_U2;
-				Disable_Ho_W2;
-				Disable_Lo_V2;
-				Enable_Ho_V2;   // V +
-				Enable_Lo_W2;   // W -
-				break;
-			case 5:
-				Disable_Ho_V2;
-				Disable_Ho_W2;
-				Disable_Lo_U2;
-				Disable_Lo_V2;
-				Enable_Ho_U2;   // U +
-				Enable_Lo_W2;   // W -
-				break;
-			case 6:
-				Disable_Lo_W2;
-				Disable_Ho_V2;
-				Disable_Ho_W2;
-				Disable_Lo_U2;
-				Enable_Ho_U2;    // U +
-				Enable_Lo_V2;    // V -
-				break;
-		}
-	}
-}
-//-------------------------------------------------------------------------------
 // Управление по обратной ЭДС ДВИГАТЕЛЬ 1
 void control_emf(void)
 {

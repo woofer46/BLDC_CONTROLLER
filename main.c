@@ -14,7 +14,7 @@ uint16_t delay_timeBLDC1=0;                          // Счетчик заде�
 uint16_t delay_timeBLDC2=0;                          // --//--//-- (Двиг 2)
 uint8_t CountStates_ticks = 0;                       // Счетчик времение счета прошедших состояний (для регулятора)
 
-uint8_t Receive_buf[256];
+
 uint8_t Temp_buf[6];
 uint8_t Receive=0;
 uint8_t tmp=0;
@@ -28,8 +28,8 @@ uint8_t current_stateBLDC1 =0;                       // Флаг того что
 uint8_t previous_stateBLDC1 =0;                      // Предыдущее состояние
 uint8_t CountStates_statesBLDC1 = 0;                 // Счетчик количества переключений по состояниям (для регулятора)
 uint8_t emf_delayBLDC1=19;//3                        // Время удержания состояния (Обр Эдс)
-uint8_t LeftHallCounter = 0;							// Счетчик тиков состояния
-uint8_t RightHallCounter = 0;
+uint16_t LeftHallCounter = 0;							// Счетчик тиков состояния
+uint16_t RightHallCounter = 0;
 uint16_t HallCounterState = 42;
 uint16_t SpeedSendTime = 0;							// тестируем измерение скорости
 uint8_t count_step_statesBLDC2=0;
@@ -58,12 +58,11 @@ uint8_t RightSpeed=0;
 uint8_t LeftDir = 0;
 uint8_t RightDir = 0;
 
-uint16_t BufFill=0;
-uint16_t BufRd=0;
+
 
 uint16_t tBufFill=0;
 uint16_t tBufRd=0;
-uint16_t BufWr=0;
+
 
 uint8_t DriveMode=0x01;
 
@@ -339,7 +338,7 @@ int main(void)
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_USART2); //Rx Приемник
 
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
-	USART_InitUser.USART_BaudRate=256000;
+	USART_InitUser.USART_BaudRate=115200;
 	USART_InitUser.USART_HardwareFlowControl=USART_HardwareFlowControl_None;
 	USART_InitUser.USART_Mode=USART_Mode_Rx|USART_Mode_Tx;
 	USART_InitUser.USART_Parity=USART_Parity_No;
@@ -350,7 +349,7 @@ int main(void)
 	USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);
 	USART_Cmd(USART2, ENABLE);
 	//-------------------------------------------------------------------------------
-	str_to_usart("Program is ready\n\r");
+	//str_to_usart("Program is ready\n\r");
 	//control_hall_motor1();
     while(1)
 
@@ -364,12 +363,106 @@ int main(void)
 }
 //Обработчик прерывания юарт
 uint8_t command_buffer[6];
-uint8_t read_index = 0;
+#define BUF_SIZE 1000
+
+uint32_t BufWr=0;
+uint32_t BufFill=0;
+uint32_t BufRd=0;
+uint32_t Receive_buf[BUF_SIZE];
+uint32_t read_index = 0;
+
+
 #define LOG_SIZE 10000
 uint8_t log[LOG_SIZE];
 uint32_t log_w = 0;
 uint32_t log_r = 0;
 uint8_t log_start = 0;
+
+uint8_t dir_motor1 = 0;//r
+uint8_t dir_motor2 = 0;//l
+
+void read_uart(void)
+{
+	char buffer[12];
+	while(BufFill>5) // Если в буфере 5 байт или больше
+	{
+		// Теперь проверим что это наш пакет
+		// 0б - 0х00 | 1б - скорость лево | 2б - скорость право | 3б - режим | 4б - \n | 5б - \r
+		if ((Receive_buf[read_index] == 0x00) && (Receive_buf[read_index + 4] == 0x0A) && (Receive_buf[read_index + 5] == 0x0D))
+		{
+			log_start = 1;
+			command_buffer[0] = Receive_buf[read_index + 1];
+			command_buffer[1] = Receive_buf[read_index + 2];
+			command_buffer[2] = Receive_buf[read_index + 3]; // DriveMode 0x01 - Hall, 0x02 - EMF, 0x00 - Disable
+
+			read_index = read_index + 6;
+			BufFill = BufFill - 6;
+
+			dir_motor2 = command_buffer[0] >> 7;
+			dir_motor1 = command_buffer[1] >> 7;
+			if(dir_motor2 == 1)
+				LeftSpeed = ~command_buffer[0] + 0x01;
+			else
+				LeftSpeed = command_buffer[0];
+
+			if(dir_motor1 == 1)
+				RightSpeed = ~command_buffer[1] + 0x01;
+			else
+				RightSpeed = command_buffer[1];
+
+			TIM_SetCompare1(TIM1, (RightSpeed&0x7F)*5);
+			TIM_SetCompare2(TIM1, (RightSpeed&0x7F)*5);
+			TIM_SetCompare3(TIM1, (RightSpeed&0x7F)*5); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
+
+			TIM_SetCompare1(TIM8, (LeftSpeed&0x7F)*5);
+			TIM_SetCompare2(TIM8, (LeftSpeed&0x7F)*5);
+			TIM_SetCompare3(TIM8, (LeftSpeed&0x7F)*5);
+
+
+			str_to_usart(" L speed: ");
+			utoa(LeftSpeed, buffer, 10);
+			str_to_usart(buffer);
+
+			str_to_usart(" L dir: ");
+			utoa(dir_motor2, buffer, 10);
+			str_to_usart(buffer);
+
+			//str_to_usart(" L hall: ");
+			//utoa(LeftHallCounter, buffer, 10);
+			//str_to_usart(buffer);
+
+			str_to_usart(" R speed: ");
+			utoa(RightSpeed, buffer, 10);
+			str_to_usart(buffer);
+
+			str_to_usart(" R dir: ");
+			utoa(dir_motor1, buffer, 10);
+			str_to_usart(buffer);
+
+			//str_to_usart(" R hall: ");
+			//utoa(RightHallCounter, buffer, 10);
+			//str_to_usart(buffer);
+
+
+
+		}
+		else
+		{
+			read_index = read_index + 1;
+			BufFill = BufFill - 1;
+			str_to_usart(" st 0");
+		}
+		if(read_index >= BUF_SIZE) // Если мы прочитали 255й байт из массива, то следующий должен быть 0й индекс массива
+			read_index=0;
+		if(BufWr >= BUF_SIZE)
+			BufWr=0;
+
+		utoa(BufFill, buffer, 10);
+		str_to_usart(buffer);
+		str_to_usart(" end  \r\n");
+	}// - end of While
+}
+
 
 void USART2_IRQHandler(void)
 {
@@ -383,54 +476,7 @@ void USART2_IRQHandler(void)
 		Receive_buf[BufWr] = USART_ReceiveData(USART2); // Закидываем байт в буфер
 		BufFill++;                                      // Говорим что его размер увеличился на 1
 		BufWr++;                                        // Чтобы следуюющий пришедший байт не перетер этот смещаем индекс на 1
-
-		while(BufFill>5) // Если в буфере 5 байт или больше
-		{ 	
-			// Теперь проверим что это наш пакет
-			// 0б - 0х00 | 1б - скорость лево | 2б - скорость право | 3б - режим | 4б - \n | 5б - \r
-			if ((Receive_buf[read_index] == 0x00) && (Receive_buf[read_index + 4] == 0x0A) && (Receive_buf[read_index + 5] == 0x0D))
-			{
-				log_start = 1;
-				command_buffer[0] = Receive_buf[read_index + 1];
-				command_buffer[1] = Receive_buf[read_index + 2];
-				command_buffer[2] = Receive_buf[read_index + 3]; // DriveMode 0x01 - Hall, 0x02 - EMF, 0x00 - Disable
-
-				read_index = read_index + 6;
-				BufFill = BufFill - 6;
-
-				LeftDir = command_buffer[0] >> 7;
-				RightDir = command_buffer[1] >> 7;
-				if(LeftDir == 1)
-					LeftSpeed = ~command_buffer[0] + 0x01;
-				else
-					LeftSpeed = command_buffer[0];
-
-				if(RightDir == 1)
-					RightSpeed = ~command_buffer[1] + 0x01;
-				else
-					RightSpeed = command_buffer[1];
-
-				TIM_SetCompare1(TIM1, (RightSpeed&0x7F)*15);
-				TIM_SetCompare2(TIM1, (RightSpeed&0x7F)*15);
-				TIM_SetCompare3(TIM1, (RightSpeed&0x7F)*15); //обрезаем 7 бит и пропорционально меняем 0-127 на 0- ~2000
-
-				TIM_SetCompare1(TIM8, (LeftSpeed&0x7F)*15);
-				TIM_SetCompare2(TIM8, (LeftSpeed&0x7F)*15);
-				TIM_SetCompare3(TIM8, (LeftSpeed&0x7F)*15);
-
-
-			}
-			else
-			{
-				read_index = read_index + 1;
-				BufFill = BufFill - 1;
-			}
-			if(read_index > 255) // Если мы прочитали 255й байт из массива, то следующий должен быть 0й индекс массива
-				read_index=0;
-			if(BufWr > 255)
-				BufWr=0;
-
-		}// - end of While
+		read_uart();
 	}// - end of If
 }// - end of Function
 //-----------------------------------------------------------------------
@@ -467,34 +513,24 @@ void delay_ms(uint16_t del_temp)
 }
 void SysTick_Handler(void) // Таймер 1мс
 {
+	if (SpeedSendTime < 1000)
+		SpeedSendTime++;
+	else
+	{
+		char buffer[12];
+
+
+		LeftHallCounter = 0;
+		RightHallCounter = 0;
+		SpeedSendTime = 0;
+	}
+    /*
 	if(del_count>0)
 		del_count--;
 	if(delay_timeBLDC1>0)
 		delay_timeBLDC1--; //Отсчет задержки
 	if(delay_timeBLDC2>0)
 		delay_timeBLDC2--;
-
-	if (SpeedSendTime < 1000)
-		SpeedSendTime++;
-	else
-	{
-		//CurrentSpeed = HallCounter/14*60;
-		//char buf[14] = {'B','L',0,0,0,0,'R',0,0,0,0, '\n','\r',0};
-		//buf[2] = (RightHallCounter%10000)/1000 + 48;
-		//buf[3] = (RightHallCounter%1000)/100 + 48;
-		//buf[4] = (RightHallCounter%100)/10 + 48;
-		//buf[5] = (RightHallCounter%10) + 48;
-
-		//buf[7] = (LeftHallCounter)/1000 + 48;
-		//buf[8] = (LeftHallCounter%1000)/100 + 48;
-		//buf[9] = (LeftHallCounter%100)/10 + 48;
-		//buf[10] = LeftHallCounter%10 + 48;
-		//str_to_usart(buf);
-		//LeftHallCounter = 0;
-		//RightHallCounter = 0;
-		SpeedSendTime = 0;
-	}
-
 	if(CountStates_ticks < 250) // Считаем 250 мс
 	{
 		CountStates_ticks++;
@@ -505,18 +541,18 @@ void SysTick_Handler(void) // Таймер 1мс
 		//USART_SendData(USART2, CountStates_statesBLDC2);// Для ПИД регулятора
 		//CountStates_statesBLDC1 = 0;
 		CountStates_statesBLDC2=0;
-	}
+	}*/
 }
 
 //-------------------------------------------------------------------------------
-// Управление по датчикам холла ДВИГАТЕЛЬ 1 LEFT
+// Управление по датчикам холла ДВИГАТЕЛЬ 1 Right
 uint8_t hall_motor1= 0;
 uint8_t state_m1 = 0;
 uint8_t prev_state_m1 = 100;
-uint8_t dir_motor1 = 1;
 
 
-void control_hall_motor1(void)
+
+void control_hall_motor1(void)//Right motor
 {
 	hall_motor1 = 0;
 	hall_motor1 = (ReadStateHall1Motor1) | (ReadStateHall2Motor1<<1) | (ReadStateHall3Motor1<<2);
@@ -539,6 +575,7 @@ void control_hall_motor1(void)
 	if(state_m1 != prev_state_m1)
 	{
 		prev_state_m1 = state_m1;
+		RightHallCounter++;
 		switch(state_m1)
 		{
 			case 1:
@@ -593,18 +630,18 @@ void control_hall_motor1(void)
 	}
 }
 //-------------------------------------------------------------------------------
-// Управление по датчикам холла ДВИГАТЕЛЬ 2 R
+// Управление по датчикам холла ДВИГАТЕЛЬ 2 Left
 uint8_t hall_motor2= 0;
 uint8_t state_m2 = 0;
 uint8_t prev_state_m2 = 100;
-uint8_t dir_motor2 = 0;
+
 
 
 void control_hall_motor2(void)
 {
 	hall_motor2 = 0;
 	hall_motor2 = (ReadStateHall1Motor2) | (ReadStateHall2Motor2<<1) | (ReadStateHall3Motor2<<2);
-	if(dir_motor2 == 1)
+	if(dir_motor2 == 0)
 		hall_motor2 = (~hall_motor2) & 0x07;
 
 	if(hall_motor2 == 0b110) // 011
@@ -623,6 +660,7 @@ void control_hall_motor2(void)
 	if(state_m2 != prev_state_m2)
 	{
 		prev_state_m2 = state_m2;
+		LeftHallCounter++;
 		switch(state_m2)
 		{
 			case 1:
